@@ -170,6 +170,42 @@ class SnowLumaApiClient {
   Future<Map<String, dynamic>> getLoginInfo(int uin) =>
       invoke(uin: uin, action: 'get_login_info', params: {});
 
+  // ---- QQ 进程接入 ----
+
+  /// 进程列表（服务器上检测到的 QQ 进程）
+  Future<List<Map<String, dynamic>>> processes() async {
+    final resp = await http.get(_uri('/api/processes'), headers: _headers());
+    final body = _json(resp.body);
+    return (body['list'] as List? ?? const []).cast<Map<String, dynamic>>();
+  }
+
+  /// 加载进程（接入 QQ 登录态）
+  Future<Map<String, dynamic>> processLoad(String id) async {
+    final resp = await http.post(
+      _uri('/api/processes/$id/load'),
+      headers: _headers(),
+    );
+    return _json(resp.body);
+  }
+
+  /// 卸载进程
+  Future<Map<String, dynamic>> processUnload(String id) async {
+    final resp = await http.post(
+      _uri('/api/processes/$id/unload'),
+      headers: _headers(),
+    );
+    return _json(resp.body);
+  }
+
+  /// 刷新进程（重新检测登录态）
+  Future<Map<String, dynamic>> processRefresh(String id) async {
+    final resp = await http.post(
+      _uri('/api/processes/$id/refresh'),
+      headers: _headers(),
+    );
+    return _json(resp.body);
+  }
+
   Map<String, dynamic> _json(String body) =>
       (jsonDecode(body) as dynamic)?.cast<String, dynamic>() ?? {};
 }
