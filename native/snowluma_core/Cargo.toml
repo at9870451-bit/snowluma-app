@@ -1,0 +1,15 @@
+[package]
+name = "snowluma_core"
+version = "1.0.0"
+edition = "2021"
+description = "SnowLuma 前端 Rust Core — 会话/账号/动作核心逻辑与凭据保护"
+
+[lib]
+name = "snowluma_core"
+crate-type = ["staticlib", "rlib"]
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha2 = "0.10"
+base64 = "0.22"
