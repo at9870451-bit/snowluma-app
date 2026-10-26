@@ -1,0 +1,193 @@
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:webview_flutter/webview_flutter.dart';
+
+import '../core/app_state.dart';
+import '../core/bridge.dart';
+
+/// 扫码登录页 — 内嵌 noVNC（QQ 远程桌面），自动填入远程桌面密码直接连接
+class VncPage extends StatefulWidget {
+  const VncPage({super.key});
+
+  @override
+  State<VncPage> createState() => _VncPageState();
+}
+
+class _VncPageState extends State<VncPage> {
+  late final WebViewController _web;
+  final _pwCtl = TextEditingController();
+  bool _loading = true;
+  String _vncUrl = '';
+
+  @override
+  void initState() {
+    super.initState();
+    // 读取 VNC 密码（Rust 保护存储）
+    try {
+      final r = SnowLumaBridge.call('session.load_vnc');
+      _pwCtl.text = r['password'] as String? ?? '';
+    } catch (_) {}
+    // 从服务器地址解析 host，拼 noVNC URL
+    final base = appState.baseUrl;
+    final uri = Uri.tryParse(base);
+    final host = uri?.host ?? base;
+    _vncUrl = 'http://$host:6081/vnc.html?autoconnect=true';
+    _web = WebViewController()
+      ..setJavaScriptMode(JavaScriptMode.unrestricted)
+      ..setBackgroundColor(const Color(0xFF111216))
+      ..setNavigationDelegate(NavigationDelegate(
+        onPageFinished: (_) {
+          _autoConnect();
+          if (mounted) setState(() => _loading = false);
+        },
+        onWebResourceError: (_) {
+          if (mounted) setState(() => _loading = false);
+        },
+      ))
+      ..loadRequest(Uri.parse(_vncUrl));
+  }
+
+  /// 页面加载完成：把远程桌面密码填入 noVNC 并点击连接
+  void _autoConnect() {
+    if (_pwCtl.text.isEmpty) return;
+    final js = '''
+(function() {
+  var tries = 0;
+  function fill() {
+    var p = document.getElementById('passwordInput');
+    var b = document.getElementById('connectButton');
+    if (p) { p.value = '${_pwCtl.text}'; }
+    if (b) {
+      b.click();
+      return true;
+    }
+    return false;
+  }
+  if (!fill()) {
+    var t = setInterval(function() {
+      tries++;
+      if (fill()) { clearInterval(t); }
+      else if (tries > 40) { clearInterval(t); }
+    }, 500);
+  }
+})();
+''';
+    _web.runJavaScript(js);
+  }
+
+  Future<void> _savePassword() async {
+    try {
+      SnowLumaBridge.call('session.save_vnc', {'password': _pwCtl.text});
+    } catch (e) {
+      debugPrint('保存 VNC 密码失败: $e');
+    }
+  }
+
+  @override
+  void dispose() {
+    _pwCtl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final text = Theme.of(context).textTheme;
+    return Scaffold(
+      backgroundColor: const Color(0xFF111216),
+      appBar: AppBar(
+        title: const Text('扫码登录 QQ'),
+        backgroundColor: const Color(0xFF111216),
+        foregroundColor: Colors.white,
+      ),
+      body: SafeArea(
+        child: Column(
+          children: [
+            // 密码输入条
+            Material(
+              color: const Color(0xFF1D1E24),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                child: Row(
+                  children: [
+                    const Icon(Icons.key_rounded, size: 18, color: Colors.white70),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: TextField(
+                        controller: _pwCtl,
+                        style: const TextStyle(color: Colors.white, fontSize: 14),
+                        obscureText: true,
+                        decoration: InputDecoration(
+                          hintText: '远程桌面密码（VNC_PASSWD）',
+                          hintStyle: const TextStyle(color: Colors.white38, fontSize: 13),
+                          isDense: true,
+                          filled: true,
+                          fillColor: const Color(0xFF2A2C36),
+                          contentPadding:
+                              const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(10),
+                            borderSide: BorderSide.none,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    FilledButton.icon(
+                      onPressed: () {
+                        HapticFeedback.lightImpact();
+                        _savePassword();
+                        if (_pwCtl.text.isNotEmpty) _autoConnect();
+                      },
+                      icon: const Icon(Icons.smartphone, size: 16),
+                      label: const Text('连接', style: TextStyle(fontSize: 13)),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            // noVNC WebView
+            Expanded(
+              child: Stack(
+                children: [
+                  WebViewWidget(controller: _web),
+                  if (_loading)
+                    Container(
+                      color: const Color(0xFF111216),
+                      alignment: Alignment.center,
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const CircularProgressIndicator(color: Colors.white70),
+                          const SizedBox(height: 12),
+                          Text('正在连接远程桌面…',
+                              style: text.bodySmall
+                                  ?.copyWith(color: Colors.white70)),
+                        ],
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            // 操作提示
+            Container(
+              color: const Color(0xFF1D1E24),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              child: Row(
+                children: [
+                  const Icon(Icons.info_outline, size: 14, color: Colors.white54),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      '连接后桌面内 QQ 已自动运行，用手机 QQ 扫码即可登录；登录成功后回 App 主页刷新可看到账号',
+                      style: TextStyle(fontSize: 11, color: Colors.white54),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
