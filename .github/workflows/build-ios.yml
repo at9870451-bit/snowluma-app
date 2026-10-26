@@ -1,0 +1,153 @@
+# SnowLuma 前端 — Flutter UI + Rust Core
+# iOS 里程碑构建：Flutter UI + Rust staticlib（aarch64-apple-ios）→ 未签名 ipa → Release
+name: Build SnowLuma App
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["main"]
+    paths:
+      - "lib/**"
+      - "native/**"
+      - "ios/**"
+      - "pubspec.yaml"
+      - ".github/workflows/build-ios.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Flutter + Rust → ipa（${{ matrix.runner }}）
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [macos-15, macos-latest]
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 安装 Rust（iOS 目标）
+        uses: dtolnay/rust-toolchain@1.84.1
+        with:
+          toolchain: 1.84.1
+          targets: aarch64-apple-ios
+
+      - name: 安装 Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: 版本信息
+        run: |
+          flutter --version
+          rustc --version
+          cargo --version
+
+      - name: 生成 Flutter 脚手架（已存在文件不会被覆盖）
+        run: flutter create --org com.snowluma --project-name snowluma .
+
+      - name: xcconfig 补丁（禁 strip / dead-strip，保住 FFI 符号）
+        run: |
+          for cfg in Debug Release; do
+            printf '\n// SnowLuma: 保留 Rust FFI 符号（Dart dlsym 需要）\nSTRIP_INSTALLED_PRODUCT=NO\nDEAD_CODE_STRIPPING=NO\n' >> "ios/Flutter/${cfg}.xcconfig"
+          done
+          tail -4 ios/Flutter/Release.xcconfig
+
+      - name: Rust → iOS 静态库
+        run: |
+          set -o pipefail
+          cargo build --release --target aarch64-apple-ios --manifest-path native/snowluma_core/Cargo.toml 2>&1 | tee rust-ios.log | tail -30
+          mkdir -p native/libs/ios
+          cp native/snowluma_core/target/aarch64-apple-ios/release/libsnowluma_core.a native/libs/ios/
+          echo "=== 静态库 ==="; ls -lh native/libs/ios/
+          nm -gU native/libs/ios/libsnowluma_core.a 2>/dev/null | grep -E 'snowluma_(call|free)' || echo "nm 跳过：Xcode nm 无法读取新版 LLVM 产物"
+
+      - name: Runner 工程注入链接设置（force_load + 禁 strip，保 FFI 符号）
+        run: |
+          ruby tools/fix_xcodeproj.rb
+          echo "=== 注入完成 ==="
+          grep -n "snowluma_core\|force_load" ios/Runner.xcodeproj/project.pbxproj | head -5
+
+      - name: pod install
+        working-directory: ios
+        run: pod install 2>&1 | tail -20
+
+      - name: 编译 iOS（未签名，xcodebuild 直链）
+        run: |
+          set -o pipefail
+          flutter precache --ios
+          flutter build ios --config-only --release --no-codesign
+          cd ios
+          set -o pipefail
+          xcodebuild \
+            -workspace Runner.xcworkspace \
+            -scheme Runner \
+            -configuration Release \
+            -sdk iphoneos \
+            -derivedDataPath ../build \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            build 2>&1 | tee ../xcodebuild.log | tail -40
+
+      - name: 验证符号已链入（-force_load 生效）
+        run: |
+          BIN=build/Build/Products/Release-iphoneos/Runner.app/Runner
+          test -f "$BIN"
+          if nm "$BIN" | grep -q '_snowluma_call'; then
+            echo "✓ snowluma_call 已链入 Runner"
+          else
+            echo "::error::snowluma_call 不在 Runner 二进制里（检查 -force_load）"
+            exit 1
+          fi
+
+      - name: 打包 ipa
+        run: |
+          APP=build/Build/Products/Release-iphoneos/Runner.app
+          rm -rf Payload SnowLuma.ipa
+          mkdir Payload
+          cp -R "$APP" Payload/
+          /usr/libexec/PlistBuddy -c "Set :CFBundleDisplayName SnowLuma" Payload/Runner.app/Info.plist 2>/dev/null \
+            || /usr/libexec/PlistBuddy -c "Add :CFBundleDisplayName string SnowLuma" Payload/Runner.app/Info.plist
+          /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString 1.0.0" Payload/Runner.app/Info.plist
+          /usr/libexec/PlistBuddy -c "Set :CFBundleVersion ${GITHUB_RUN_NUMBER}" Payload/Runner.app/Info.plist
+          zip -qry SnowLuma.ipa Payload
+          echo "=== 产物 ==="
+          ls -lh SnowLuma.ipa
+          echo "SHA256: $(shasum -a 256 SnowLuma.ipa | awk '{print $1}')"
+          echo "架构: $(lipo -archs Payload/Runner.app/Runner)"
+
+      - name: 上传产物
+        uses: actions/upload-artifact@v4
+        with:
+          name: snowluma-app-ipa
+          path: SnowLuma.ipa
+          retention-days: 30
+
+      - name: 发 Release
+        if: matrix.runner == 'macos-15'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: snowluma-build-${{ github.run_number }}
+          name: "SnowLuma App 构建 #${{ github.run_number }}"
+          body: |
+            SnowLuma 前端（Flutter UI + Rust Core，FFI JSON 总线）。
+            提交：`${{ github.sha }}`
+          files: SnowLuma.ipa
+          draft: false
+          prerelease: false
+
+      - name: 失败上传日志
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: snowluma-app-build-log
+          path: |
+            xcodebuild.log
+            rust-ios.log
+          retention-days: 7
+          if-no-files-found: ignore
