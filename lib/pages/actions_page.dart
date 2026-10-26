@@ -79,7 +79,8 @@ class _ActionsPageState extends State<ActionsPage> {
 
   void _paramsDialog(
       Map<String, dynamic> action, String label, Future<void> Function(Map<String, dynamic>) onRun) {
-    final keys = (action['example'] as Map? ?? const {}).keys.toList();
+    final keys = (action['example'] as Map? ?? const {})
+        .keys.whereType<String>().toList();
     final controllers =
         {for (final k in keys) k: TextEditingController()};
     showDialog<void>(
@@ -206,15 +207,16 @@ class _ActionsPageState extends State<ActionsPage> {
                       : ListView(
                           padding: const EdgeInsets.symmetric(horizontal: 12),
                           children: [
-                            for (final cat in byCat.keys)
+                            for (final cat in byCat.keys) ...[
                               Padding(
                                 padding: const EdgeInsets.only(top: 10, bottom: 6),
                                 child: Text(cat,
                                     style: text.titleSmall
                                         ?.copyWith(color: Colors.indigo.shade700)),
                               ),
-                            for (final a in byCat[cat]!)
-                              _actionTile(context, a),
+                              for (final a in byCat[cat]!)
+                                _actionTile(context, a),
+                            ],
                           ],
                         ),
             ),
