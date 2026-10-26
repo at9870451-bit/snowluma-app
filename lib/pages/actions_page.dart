@@ -267,7 +267,7 @@ class _ActionsPageState extends State<ActionsPage> {
           side: BorderSide(color: Colors.grey.shade200)),
       child: ListTile(
         contentPadding: const EdgeInsets.symmetric(horizontal: 14),
-        leading: const Icon(Icons.play_circle_outline,
+        leading: Icon(Icons.play_circle_outline,
             size: 20, color: Colors.indigo.shade700),
         title: Text(a['name'] as String? ?? '',
             style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
