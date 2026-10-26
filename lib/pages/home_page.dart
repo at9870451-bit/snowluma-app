@@ -5,6 +5,7 @@ import '../core/bridge.dart';
 import 'actions_page.dart';
 import 'login_page.dart';
 import 'processes_page.dart';
+import 'vnc_page.dart';
 import 'logs_page.dart';
 
 /// 主页 — 服务状态 + QQ 账号列表 + 动作/日志入口
@@ -216,11 +217,21 @@ class _HomePageState extends State<HomePage> {
             FilledButton.icon(
               onPressed: () {
                 Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const VncPage()),
+                );
+              },
+              icon: const Icon(Icons.qr_code_scanner, size: 18),
+              label: const Text('扫码登录 QQ'),
+            ),
+            const SizedBox(height: 8),
+            TextButton.icon(
+              onPressed: () {
+                Navigator.of(context).push(
                   MaterialPageRoute(builder: (_) => const ProcessesPage()),
                 );
               },
               icon: const Icon(Icons.dns_outlined, size: 18),
-              label: const Text('接入 QQ'),
+              label: const Text('进程 / 账号管理'),
             ),
           ],
         ),
