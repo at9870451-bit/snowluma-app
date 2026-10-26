@@ -88,7 +88,7 @@ class _HomePageState extends State<HomePage> {
                 case 'logout':
                   await appState.disconnect();
                   if (mounted) Navigator.of(context).pushAndRemoveUntil(
-                    MaterialPageRoute(builder: (_) => const LoginPage(onConnected: () {})),
+                    MaterialPageRoute(builder: (_) => LoginPage(onConnected: () {})),
                     (_) => false,
                   );
               }
@@ -196,7 +196,7 @@ class _HomePageState extends State<HomePage> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.perm_contact_calendar_outlined,
+            Icon(Icons.perm_contact_calendar_outlined,
                 size: 40, color: Colors.grey.shade300),
             const SizedBox(height: 8),
             Text('暂无 QQ 账号', style: text.titleMedium),
@@ -239,7 +239,7 @@ class _HomePageState extends State<HomePage> {
             ),
             trailing: IconButton(
               onPressed: () => _msgDialog(uin),
-              icon: const Icon(Icons.send_rounded,
+              icon: Icon(Icons.send_rounded,
                   color: Colors.indigo.shade700),
             ),
           ),
