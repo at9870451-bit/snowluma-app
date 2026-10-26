@@ -114,7 +114,7 @@ fn dispatch(method: &str, payload: &Value) -> String {
         "agreement.parse" => {
             let body = get(payload, "body");
             let version = body["version"].as_str().unwrap_or_default().to_string();
-            let consent = body["consentRequired"].and_then(|v| v.as_bool()).unwrap_or(false);
+            let consent = body.get("consentRequired").and_then(|v| v.as_bool()).unwrap_or(false);
             let docs = body.get("documents").and_then(|d| d.as_array()).cloned().unwrap_or_default();
             ok(json!({
                 "version": version,
@@ -171,7 +171,9 @@ fn dispatch(method: &str, payload: &Value) -> String {
             let uin = get(payload, "uin").as_i64().unwrap_or(0);
             let params = get(payload, "params").clone();
             let errs = actions::validate_action(&name, &params);
-            ok(actions::build_action(&name, uin, &params).merge(json!({ "errors": errs })))
+            let mut r = actions::build_action(&name, uin, &params);
+            r["errors"] = json!(errs);
+            ok(r)
         }
         "action.validate" => {
             let name = get_str(payload, "name");
