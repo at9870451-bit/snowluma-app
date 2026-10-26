@@ -81,6 +81,11 @@ fn dispatch(method: &str, payload: &Value) -> String {
         "session.load" => ok(session::load(&data_dir())),
         "session.clear" => ok(session::clear(&data_dir())),
         "session.normalize" => ok(json!({ "url": session::normalize_base_url(&get_str(payload, "url")) })),
+        "session.save_vnc" => match session::save_vnc(&data_dir(), &get_str(payload, "password")) {
+            Ok(v) => ok(v),
+            Err(e) => err("save_vnc_failed", &e),
+        },
+        "session.load_vnc" => ok(session::load_vnc(&data_dir())),
         "auth.parse_login" => {
             let body = get(payload, "body");
             let mut state = SessionState::Invalid;
