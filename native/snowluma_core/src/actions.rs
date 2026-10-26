@@ -33,7 +33,7 @@ pub fn validate_action(name: &str, params: &Value) -> Vec<String> {
         Some(o) => o,
         None => return vec!["params 必须是 JSON 对象".to_string()],
     };
-    let Some((_n, required)) = REQUIRED_PARAMS.iter().find(|(n, _)| *n == name) else {
+    let Some((_, &required)) = REQUIRED_PARAMS.iter().find(|(n, _)| *n == name) else {
         // 未知动作：不阻塞，仅检查是否为对象
         return errs;
     };
