@@ -18,3 +18,9 @@ macos/Flutter/ephemeral/
 macos/.symlinks/
 
 .DS_Store
+# Rust
+target/
+
+# Python
+__pycache__/
+*.pyc
