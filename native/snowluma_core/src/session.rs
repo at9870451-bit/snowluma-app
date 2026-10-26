@@ -42,6 +42,23 @@ pub fn clear(data_dir: &str) -> Value {
     json!({ "cleared": true })
 }
 
+const VNC_FILE: &str = ".snowluma_vnc.json";
+
+/// 保存 VNC（扫码界面）密码（受保护存储）
+pub fn save_vnc(data_dir: &str, password: &str) -> Result<Value, String> {
+    let path = format!("{data_dir}/{VNC_FILE}");
+    crypto::write_protected(&path, password)
+        .map_err(|e| format!("写入 VNC 密码失败: {e}"))?;
+    Ok(json!({ "saved": true }))
+}
+
+/// 读取 VNC 密码
+pub fn load_vnc(data_dir: &str) -> Value {
+    let path = format!("{data_dir}/{VNC_FILE}");
+    let raw = crypto::read_protected(&path).unwrap_or_default();
+    json!({ "password": raw })
+}
+
 /// 密码强度校验（对齐 SnowLuma check-strength 规则）
 pub fn check_password_strength(password: &str) -> Value {
     let has_upper = password.chars().any(|c| c.is_ascii_uppercase());
