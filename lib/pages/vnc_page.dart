@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:webview_flutter/webview_flutter.dart';
@@ -18,6 +20,9 @@ class _VncPageState extends State<VncPage> {
   final _pwCtl = TextEditingController();
   bool _loading = true;
   String _vncUrl = '';
+  String _qrUrl = '';
+  int _qrTick = 0;
+  Timer? _qrTimer;
 
   @override
   void initState() {
@@ -27,11 +32,15 @@ class _VncPageState extends State<VncPage> {
       final r = SnowLumaBridge.call('session.load_vnc');
       _pwCtl.text = r['password'] as String? ?? '';
     } catch (_) {}
-    // 从服务器地址解析 host，拼 noVNC URL
+    // 从服务器地址解析 host，拼 noVNC URL 与二维码 URL
     final base = appState.baseUrl;
     final uri = Uri.tryParse(base);
     final host = uri?.host ?? base;
     _vncUrl = 'http://$host:6081/vnc.html?autoconnect=true';
+    _qrUrl = 'http://$host:8088/qr.png';
+    _qrTimer = Timer.periodic(const Duration(seconds: 30), (_) {
+      setState(() => _qrTick++); // 触发二维码图刷新
+    });
     _web = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
       ..setBackgroundColor(const Color(0xFF111216))
@@ -85,6 +94,7 @@ class _VncPageState extends State<VncPage> {
 
   @override
   void dispose() {
+    _qrTimer?.cancel();
     _pwCtl.dispose();
     super.dispose();
   }
@@ -145,6 +155,70 @@ class _VncPageState extends State<VncPage> {
                 ),
               ),
             ),
+            // 二维码卡（直接扫码，30 秒自动刷新）
+            Material(
+              color: const Color(0xFF1D1E24),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+                child: Column(
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(Icons.qr_code_2, size: 16, color: Colors.white70),
+                        const SizedBox(width: 6),
+                        Text('手机 QQ 扫码登录（二维码每 30 秒自动刷新）',
+                            style: TextStyle(fontSize: 12, color: Colors.white70)),
+                        const Spacer(),
+                        IconButton(
+                          onPressed: () => setState(() => _qrTick++),
+                          icon: const Icon(Icons.refresh, size: 18, color: Colors.white70),
+                          tooltip: '立即刷新二维码',
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    Center(
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        padding: const EdgeInsets.all(6),
+                        child: Image.network(
+                          '$_qrUrl?t=$_qrTick',
+                          width: 200,
+                          height: 190,
+                          fit: BoxFit.contain,
+                          errorBuilder: (_, __, ___) => Container(
+                            width: 200,
+                            height: 190,
+                            color: const Color(0xFF2A2C36),
+                            alignment: Alignment.center,
+                            child: const Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.error_outline, color: Colors.white54),
+                                SizedBox(height: 6),
+                                Text('二维码加载失败', style: TextStyle(color: Colors.white54, fontSize: 12)),
+                              ],
+                            ),
+                          ),
+                          loadingBuilder: (_, child, progress) => progress == null
+                              ? child
+                              : Container(
+                                  width: 200,
+                                  height: 190,
+                                  color: const Color(0xFF2A2C36),
+                                  alignment: Alignment.center,
+                                  child: const CircularProgressIndicator(color: Colors.white54),
+                                ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
             // noVNC WebView
             Expanded(
               child: Stack(
@@ -178,7 +252,7 @@ class _VncPageState extends State<VncPage> {
                   const SizedBox(width: 6),
                   Expanded(
                     child: Text(
-                      '连接后桌面内 QQ 已自动运行，用手机 QQ 扫码即可登录；登录成功后回 App 主页刷新可看到账号',
+                      '直接扫上方二维码即可登录；下方为远程桌面（可操作 QQ），登录后回主页刷新查看账号',
                       style: TextStyle(fontSize: 11, color: Colors.white54),
                     ),
                   ),
