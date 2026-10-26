@@ -18,6 +18,8 @@ dependencies:
   http: ^1.2.2
   # 沙盒目录（Rust Core 数据目录）
   path_provider: ^2.1.3
+  # 扫码登录：内嵌 noVNC（QQ 远程桌面）
+  webview_flutter: ^4.7.0
 
 dev_dependencies:
   flutter_test:
