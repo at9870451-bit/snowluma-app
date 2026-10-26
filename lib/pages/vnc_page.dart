@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 import 'package:flutter/services.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
@@ -82,6 +83,14 @@ class _VncPageState extends State<VncPage> {
 })();
 ''';
     _web.runJavaScript(js);
+  }
+
+  /// 强制刷新：通知服务器点击 QQ 的「刷新」重新生成二维码
+  Future<void> _forceRefreshQr() async {
+    try {
+      await http.get(Uri.parse('$_qrUrl?refresh=1')).timeout(const Duration(seconds: 60));
+    } catch (_) {}
+    if (mounted) setState(() => _qrTick++);
   }
 
   Future<void> _savePassword() async {
@@ -170,9 +179,9 @@ class _VncPageState extends State<VncPage> {
                             style: TextStyle(fontSize: 12, color: Colors.white70)),
                         const Spacer(),
                         IconButton(
-                          onPressed: () => setState(() => _qrTick++),
+                          onPressed: _forceRefreshQr,
                           icon: const Icon(Icons.refresh, size: 18, color: Colors.white70),
-                          tooltip: '立即刷新二维码',
+                          tooltip: '强制刷新二维码',
                         ),
                       ],
                     ),
