@@ -4,6 +4,7 @@ import '../core/app_state.dart';
 import '../core/bridge.dart';
 import 'actions_page.dart';
 import 'login_page.dart';
+import 'processes_page.dart';
 import 'logs_page.dart';
 
 /// 主页 — 服务状态 + QQ 账号列表 + 动作/日志入口
@@ -78,6 +79,10 @@ class _HomePageState extends State<HomePage> {
           PopupMenuButton<String>(
             onSelected: (v) async {
               switch (v) {
+                case 'processes':
+                  Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const ProcessesPage()),
+                  );
                 case 'actions':
                   Navigator.of(context).push(
                     MaterialPageRoute(builder: (_) => const ActionsPage()),
@@ -95,6 +100,9 @@ class _HomePageState extends State<HomePage> {
               }
             },
             itemBuilder: (_) => [
+              const PopupMenuItem(value: 'processes', child: ListTile(
+                  leading: Icon(Icons.dns_outlined),
+                  title: Text('接入 QQ'), dense: true, contentPadding: EdgeInsets.zero)),
               const PopupMenuItem(value: 'actions', child: ListTile(
                   leading: Icon(Icons.play_circle_outline),
                   title: Text('动作调试'), dense: true, contentPadding: EdgeInsets.zero)),
@@ -202,8 +210,18 @@ class _HomePageState extends State<HomePage> {
             const SizedBox(height: 8),
             Text('暂无 QQ 账号', style: text.titleMedium),
             const SizedBox(height: 4),
-            Text('请先到 WebUI 添加并登录 QQ',
+            Text('在服务器运行 QQ 或使用 SnowLuma Docker 部署后接入',
                 style: text.bodySmall?.copyWith(color: Colors.grey.shade600)),
+            const SizedBox(height: 12),
+            FilledButton.icon(
+              onPressed: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const ProcessesPage()),
+                );
+              },
+              icon: const Icon(Icons.dns_outlined, size: 18),
+              label: const Text('接入 QQ'),
+            ),
           ],
         ),
       );
