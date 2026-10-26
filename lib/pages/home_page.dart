@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../core/app_state.dart';
 import '../core/bridge.dart';
 import 'actions_page.dart';
+import 'login_page.dart';
 import 'logs_page.dart';
 
 /// 主页 — 服务状态 + QQ 账号列表 + 动作/日志入口
@@ -123,7 +124,7 @@ class _HomePageState extends State<HomePage> {
                   ],
                 ),
               ),
-            Expanded(child: _accounts(context, text)),
+            Expanded(child: _accountsList(context, text)),
           ],
         ),
       ),
@@ -190,7 +191,7 @@ class _HomePageState extends State<HomePage> {
         ],
       );
 
-  Widget _accounts(BuildContext context, TextTheme text) {
+  Widget _accountsList(BuildContext context, TextTheme text) {
     if (_accounts.isEmpty) {
       return Center(
         child: Column(
