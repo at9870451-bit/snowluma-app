@@ -90,7 +90,7 @@ class AppState extends ChangeNotifier {
       this.token = token;
       this.client = c;
       notifyListeners();
-      return ConnectResult.ok();
+      return ConnectResult.success();
     } catch (e) {
       return ConnectResult.fail(_fmt(e));
     }
@@ -137,6 +137,6 @@ class ConnectResult {
   final bool ok;
   final String message;
   const ConnectResult._(this.ok, this.message);
-  static ConnectResult ok() => const ConnectResult._(true, '连接成功');
+  static ConnectResult success() => const ConnectResult._(true, '连接成功');
   static ConnectResult fail(String m) => ConnectResult._(false, m);
 }
