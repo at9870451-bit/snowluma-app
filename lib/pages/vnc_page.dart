@@ -37,8 +37,9 @@ class _VncPageState extends State<VncPage> {
     final base = appState.baseUrl;
     final uri = Uri.tryParse(base);
     final host = uri?.host ?? base;
-    _vncUrl = 'http://$host:6081/vnc.html?autoconnect=true';
-    _qrUrl = 'http://$host:8088/qr.png';
+    // 走 80 反向代理（更稳，WebSocket 由 nginx 升级）
+    _vncUrl = 'http://$host/novnc/vnc.html?autoconnect=true';
+    _qrUrl = 'http://$host/qr.png';
     _qrTimer = Timer.periodic(const Duration(seconds: 30), (_) {
       setState(() => _qrTick++); // 触发二维码图刷新
     });
