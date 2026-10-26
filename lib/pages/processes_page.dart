@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../core/app_state.dart';
 import '../core/bridge.dart';
+import 'vnc_page.dart';
 
 /// 进程接入页 — QQ 进程列表 + 加载/卸载/刷新 + QQ 账号状态
 class ProcessesPage extends StatefulWidget {
@@ -87,6 +88,12 @@ class _ProcessesPageState extends State<ProcessesPage> {
         title: const Text('接入 QQ'),
         actions: [
           IconButton(
+            onPressed: () => Navigator.of(context)
+                .push(MaterialPageRoute(builder: (_) => const VncPage())),
+            icon: const Icon(Icons.qr_code_scanner),
+            tooltip: '扫码登录 QQ',
+          ),
+          IconButton(
             onPressed: _busy ? null : _refresh,
             icon: _busy
                 ? const SizedBox(
@@ -163,8 +170,15 @@ class _ProcessesPageState extends State<ProcessesPage> {
             ),
             const SizedBox(height: 6),
             Text(
-              '• 推荐：用 SnowLuma Docker 镜像部署（自带 QQ + 扫码登录界面，WebUI 登录后可直接扫码）\n• 或：在服务器运行 QQ 客户端后点右上角刷新',
+              '• 服务器已部署 Docker 版（自带 QQ），点下方「扫码登录」打开远程桌面扫码\n• 或：服务器新增 QQ 进程后点右上角刷新',
               style: text.bodySmall?.copyWith(color: Colors.grey.shade600),
+            ),
+            const SizedBox(height: 10),
+            FilledButton.icon(
+              onPressed: () => Navigator.of(context)
+                  .push(MaterialPageRoute(builder: (_) => const VncPage())),
+              icon: const Icon(Icons.qr_code_scanner, size: 18),
+              label: const Text('扫码登录 QQ'),
             ),
           ],
         ),
