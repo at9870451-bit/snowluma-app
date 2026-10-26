@@ -22,7 +22,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        runner: [macos-15]
+        runner: [macos-15-large]
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 60
 
@@ -129,7 +129,7 @@ jobs:
           retention-days: 30
 
       - name: 发 Release
-        if: matrix.runner == 'macos-15'
+        # 单 runner，直接发布
         uses: softprops/action-gh-release@v2
         with:
           tag_name: snowluma-build-${{ github.run_number }}
