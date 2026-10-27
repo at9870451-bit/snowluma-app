@@ -11,6 +11,9 @@ import 'bridge.dart';
 class SnowLumaApiClient {
   SnowLumaApiClient(this.baseUrl, this.token);
 
+  /// 全局共享 HTTP 客户端：复用 TCP/TLS 连接，显著降低请求延迟
+  static final http.Client _client = http.Client();
+
   final String baseUrl;
   String token;
 
@@ -37,7 +40,7 @@ class SnowLumaApiClient {
     if (recoveryCode != null && recoveryCode.isNotEmpty) {
       body['recoveryCode'] = recoveryCode;
     }
-    final resp = await http.post(
+    final resp = await _client.post(
       _uri('/api/login'),
       headers: _headers({'Authorization': ''}),
       body: jsonEncode(body),
@@ -47,20 +50,20 @@ class SnowLumaApiClient {
 
   Future<void> logout() async {
     try {
-      await http.post(_uri('/api/logout'), headers: _headers());
+      await _client.post(_uri('/api/logout'), headers: _headers());
     } catch (_) {}
   }
 
   // ---- 状态 ----
 
   Future<Map<String, dynamic>> status() async {
-    final resp = await http.get(_uri('/api/status'), headers: _headers());
+    final resp = await _client.get(_uri('/api/status'), headers: _headers());
     return _json(resp.body);
   }
 
   /// GET /api/auth/state → { mustChangePassword }
   Future<Map<String, dynamic>> authState() async {
-    final resp = await http.get(_uri('/api/auth/state'), headers: _headers());
+    final resp = await _client.get(_uri('/api/auth/state'), headers: _headers());
     return SnowLumaBridge.call('auth.parse_state', {'body': _json(resp.body)});
   }
 
@@ -68,13 +71,13 @@ class SnowLumaApiClient {
 
   /// GET /api/agreements → 版本 + 文档列表
   Future<Map<String, dynamic>> agreements() async {
-    final resp = await http.get(_uri('/api/agreements'), headers: _headers());
+    final resp = await _client.get(_uri('/api/agreements'), headers: _headers());
     return SnowLumaBridge.call('agreement.parse', {'body': _json(resp.body)});
   }
 
   /// POST /api/agreements/record-consent {version}
   Future<Map<String, dynamic>> recordConsent(String version) async {
-    final resp = await http.post(
+    final resp = await _client.post(
       _uri('/api/agreements/record-consent'),
       headers: _headers(),
       body: jsonEncode({'version': version}),
@@ -93,7 +96,7 @@ class SnowLumaApiClient {
     required String oldPassword,
     required String newPassword,
   }) async {
-    final resp = await http.post(
+    final resp = await _client.post(
       _uri('/api/auth/change-password'),
       headers: _headers(),
       body: jsonEncode({'oldPassword': oldPassword, 'newPassword': newPassword}),
@@ -105,7 +108,7 @@ class SnowLumaApiClient {
 
   /// GET /api/qq-list → Rust 解析账号模型
   Future<Map<String, dynamic>> qqList() async {
-    final resp = await http.get(_uri('/api/qq-list'), headers: _headers());
+    final resp = await _client.get(_uri('/api/qq-list'), headers: _headers());
     return SnowLumaBridge.call('account.parse', {'body': _json(resp.body)});
   }
 
@@ -113,7 +116,7 @@ class SnowLumaApiClient {
 
   /// GET /api/debug/actions → Rust 解析动作清单
   Future<Map<String, dynamic>> actions() async {
-    final resp = await http.get(_uri('/api/debug/actions'), headers: _headers());
+    final resp = await _client.get(_uri('/api/debug/actions'), headers: _headers());
     return SnowLumaBridge.call('action.parse', {'body': _json(resp.body)});
   }
 
@@ -128,7 +131,7 @@ class SnowLumaApiClient {
       'action': action,
       'params': params,
     });
-    final resp = await http.post(
+    final resp = await _client.post(
       _uri('/api/debug/invoke'),
       headers: _headers(),
       body: jsonEncode(built),
@@ -174,14 +177,14 @@ class SnowLumaApiClient {
 
   /// 进程列表（服务器上检测到的 QQ 进程）
   Future<List<Map<String, dynamic>>> processes() async {
-    final resp = await http.get(_uri('/api/processes'), headers: _headers());
+    final resp = await _client.get(_uri('/api/processes'), headers: _headers());
     final body = _json(resp.body);
     return (body['list'] as List? ?? const []).cast<Map<String, dynamic>>();
   }
 
   /// 加载进程（接入 QQ 登录态）
   Future<Map<String, dynamic>> processLoad(String id) async {
-    final resp = await http.post(
+    final resp = await _client.post(
       _uri('/api/processes/$id/load'),
       headers: _headers(),
     );
@@ -190,7 +193,7 @@ class SnowLumaApiClient {
 
   /// 卸载进程
   Future<Map<String, dynamic>> processUnload(String id) async {
-    final resp = await http.post(
+    final resp = await _client.post(
       _uri('/api/processes/$id/unload'),
       headers: _headers(),
     );
@@ -199,7 +202,7 @@ class SnowLumaApiClient {
 
   /// 刷新进程（重新检测登录态）
   Future<Map<String, dynamic>> processRefresh(String id) async {
-    final resp = await http.post(
+    final resp = await _client.post(
       _uri('/api/processes/$id/refresh'),
       headers: _headers(),
     );
@@ -214,16 +217,16 @@ class SnowLumaApiClient {
   Future<Map<String, dynamic>> aiConfig() async {
     final resp = await http
         .get(_uri('/ai/config'))
-        .timeout(const Duration(seconds: 15));
+        .timeout(const Duration(seconds: 8));
     return _json(resp.body);
   }
 
   Future<Map<String, dynamic>> aiSaveConfig(Map<String, dynamic> cfg) async {
-    final resp = await http.post(
+    final resp = await _client.post(
       _uri('/ai/config'),
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode(cfg),
-    ).timeout(const Duration(seconds: 15));
+    ).timeout(const Duration(seconds: 8));
     return _json(resp.body);
   }
 }
