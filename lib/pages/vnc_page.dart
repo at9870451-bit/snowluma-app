@@ -33,13 +33,10 @@ class _VncPageState extends State<VncPage> {
       final r = SnowLumaBridge.call('session.load_vnc');
       _pwCtl.text = r['password'] as String? ?? '';
     } catch (_) {}
-    // 从服务器地址解析 host，拼 noVNC URL 与二维码 URL
-    final base = appState.baseUrl;
-    final uri = Uri.tryParse(base);
-    final host = uri?.host ?? base;
-    // 走 80 反向代理（更稳，WebSocket 由 nginx 升级）
-    _vncUrl = 'http://$host/novnc/vnc.html?autoconnect=true';
-    _qrUrl = 'http://$host/qr.png';
+    // HTTPS 域名（Let's Encrypt 正式证书 + nginx 反代 WebSocket）
+    const host = 'www.daykai.asia';
+    _vncUrl = 'https://$host/novnc/vnc.html?autoconnect=true';
+    _qrUrl = 'https://$host/qr.png';
     _qrTimer = Timer.periodic(const Duration(seconds: 30), (_) {
       setState(() => _qrTick++); // 触发二维码图刷新
     });
