@@ -248,16 +248,31 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
 
   Widget _styleTile() => Padding(
         padding: const EdgeInsets.symmetric(vertical: 4),
-        child: Row(
+        child: Column(
           children: [
-            Expanded(
-              child: _styleChip('简短真人感', '像真人在 QQ 发消息：短句、口语、不客套', _replyStyle == 'human',
-                  () => setState(() => _replyStyle = 'human')),
+            Row(
+              children: [
+                Expanded(
+                  child: _styleChip('简短真人感', '短句、口语、不客套', _replyStyle == 'human',
+                      () => setState(() => _replyStyle = 'human')),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: _styleChip('话痨真人感', '话多、爱展开、跑题吐槽', _replyStyle == 'chatty',
+                      () => setState(() => _replyStyle = 'chatty')),
+                ),
+              ],
             ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: _styleChip('AI感', '完整、清晰、有条理，友好周到', _replyStyle == 'ai',
-                  () => setState(() => _replyStyle = 'ai')),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(
+                  child: _styleChip('AI感', '完整、清晰、有条理', _replyStyle == 'ai',
+                      () => setState(() => _replyStyle = 'ai')),
+                ),
+                const SizedBox(width: 8),
+                const Expanded(child: SizedBox()),
+              ],
             ),
           ],
         ),
