@@ -3,8 +3,6 @@ import 'package:flutter/material.dart';
 import '../core/app_state.dart';
 import '../core/api_client.dart';
 
-import '../core/api_client.dart';
-
 /// AI 助手设置页
 ///
 /// 配置 SnowLuma AI 网关：启用开关、OpenAI 兼容接口、模型、人设（persona）。
@@ -27,6 +25,8 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
   String _model = 'deepseek-chat';
   String _persona = '';
   String _replyStyle = 'human'; // human=简短真人感, ai=AI感
+  String _age = '';       // 人设年龄
+  String _gender = '';    // 人设性别
   String _masterUin = '';   // 主人 QQ 号（逗号分隔可多个）
   double _temperature = 0.7;
   int _maxTokens = 500;
@@ -65,6 +65,8 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
         _model = (c['model'] as String?) ?? _model;
         _persona = (c['persona'] as String?) ?? '';
         _replyStyle = (c['replyStyle'] as String?) ?? 'human';
+        _age = (c['age'] as String?) ?? '';
+        _gender = (c['gender'] as String?) ?? '';
         _masterUin = (c['masterUin'] as String?) ?? '';
         _temperature = ((c['temperature'] as num?)?.toDouble()) ?? 0.7;
         _maxTokens = (c['maxTokens'] as num?)?.toInt() ?? 500;
@@ -101,6 +103,8 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
         'model': _model.trim(),
         'persona': _persona.trim(),
         'replyStyle': _replyStyle,
+        'age': _age.trim(),
+        'gender': _gender,
         'masterUin': _masterUin.trim(),
         'temperature': _temperature,
         'maxTokens': _maxTokens,
@@ -143,6 +147,7 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
                 _field('API Key', _apiKey, (v) => _apiKey = v, obscure: true, hint: 'sk-…'),
                 _section('人设（Persona）'),
                 _personaField(),
+                _ageGenderRow(),
                 _section('回复风格'),
                 _styleTile(),
                 _section('主人权限'),
@@ -324,6 +329,42 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
       ),
     );
   }
+
+  Widget _ageGenderRow() => Padding(
+        padding: const EdgeInsets.symmetric(vertical: 6),
+        child: Row(
+          children: [
+            Expanded(
+              child: TextField(
+                controller: TextEditingController(text: _age),
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(
+                  labelText: '年龄',
+                  hintText: '如 22',
+                  prefixIcon: Icon(Icons.cake_outlined),
+                ),
+                onChanged: (v) => _age = v,
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: DropdownButtonFormField<String>(
+                initialValue: _gender.isEmpty ? '' : _gender,
+                decoration: const InputDecoration(
+                  labelText: '性别',
+                  prefixIcon: Icon(Icons.person_outline),
+                ),
+                items: const [
+                  DropdownMenuItem(value: '', child: Text('未指定')),
+                  DropdownMenuItem(value: '男', child: Text('男')),
+                  DropdownMenuItem(value: '女', child: Text('女')),
+                ],
+                onChanged: (v) => setState(() => _gender = v ?? ''),
+              ),
+            ),
+          ],
+        ),
+      );
 
   Widget _slider(String label, double value, double min, double max, void Function(double) onchg) {
     return Column(
