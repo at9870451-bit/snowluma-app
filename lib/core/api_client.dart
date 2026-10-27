@@ -258,4 +258,22 @@ class SnowLumaApiClient {
     ).timeout(const Duration(seconds: 8));
     return _json(resp.body);
   }
+
+  /// 主动开话题（冷场检查）配置：GET /ai/idle-talk
+  Future<Map<String, dynamic>> idleTalk() async {
+    final resp = await http
+        .get(_uri('/ai/idle-talk'))
+        .timeout(const Duration(seconds: 8));
+    return _json(resp.body);
+  }
+
+  /// 保存主动开话题配置：POST /ai/idle-talk（保存后 QQBot 自动重启生效）
+  Future<Map<String, dynamic>> saveIdleTalk(Map<String, dynamic> cfg) async {
+    final resp = await _client.post(
+      _uri('/ai/idle-talk'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode(cfg),
+    ).timeout(const Duration(seconds: 8));
+    return _json(resp.body);
+  }
 }
