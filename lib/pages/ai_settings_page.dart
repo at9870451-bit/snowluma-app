@@ -29,6 +29,15 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
   double _temperature = 0.7;
   int _maxTokens = 500;
 
+  // ---- 自主模式 ----
+  bool _selfMode = false;
+  bool _triggerPoke = true;
+  bool _triggerAt = true;
+  bool _triggerRandom = false;
+  int _randomRate = 10;
+  String _keywords = '';
+  bool _skipAtOthers = true;
+
   @override
   void initState() {
     super.initState();
@@ -55,6 +64,13 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
         _persona = (c['persona'] as String?) ?? '';
         _temperature = ((c['temperature'] as num?)?.toDouble()) ?? 0.7;
         _maxTokens = (c['maxTokens'] as num?)?.toInt() ?? 500;
+        _selfMode = c['selfMode'] == true;
+        _triggerPoke = c['triggerPoke'] != false;
+        _triggerAt = c['triggerAt'] != false;
+        _triggerRandom = c['triggerRandom'] == true;
+        _randomRate = (c['randomRate'] as num?)?.toInt() ?? 10;
+        _keywords = (c['keywords'] as String?) ?? '';
+        _skipAtOthers = c['skipAtOthers'] != false;
       });
     } catch (e) {
       setState(() => _message = '加载失败：$e');
@@ -82,6 +98,13 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
         'persona': _persona.trim(),
         'temperature': _temperature,
         'maxTokens': _maxTokens,
+        'selfMode': _selfMode,
+        'triggerPoke': _triggerPoke,
+        'triggerAt': _triggerAt,
+        'triggerRandom': _triggerRandom,
+        'randomRate': _randomRate,
+        'keywords': _keywords.trim(),
+        'skipAtOthers': _skipAtOthers,
       });
       setState(() =>
           _message = r['ok'] == true ? '已保存，AI 助手${_enabled ? '已启用' : '已关闭'}' : '${r['msg'] ?? '保存失败'}');
@@ -114,6 +137,20 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
                 _field('API Key', _apiKey, (v) => _apiKey = v, obscure: true, hint: 'sk-…'),
                 _section('人设（Persona）'),
                 _personaField(),
+                _section('自主模式'),
+                _selfModeTile(),
+                _triggerTile(Icons.touch_app_outlined, '被戳一戳时', _triggerPoke, (v) => _triggerPoke = v),
+                _triggerTile(Icons.person_pin_outlined, '被@时', _triggerAt, (v) => _triggerAt = v),
+                _triggerTile(Icons.shuffle, '随机接话', _triggerRandom, (v) => _triggerRandom = v),
+                if (_triggerRandom)
+                  _slider('接话概率 %', _randomRate.toDouble(), 0.0, 100.0, (v) => _randomRate = v.toInt()),
+                _keywordField(),
+                _triggerTile(Icons.block, '@了别人的消息自动跳过', _skipAtOthers, (v) => _skipAtOthers = v),
+                const Padding(
+                  padding: EdgeInsets.only(left: 4, bottom: 4),
+                  child: Text('@了本人必回；未启用自主模式时群消息默认全部回复。',
+                      style: TextStyle(fontSize: 11, color: Colors.grey)),
+                ),
                 _section('参数'),
                 _slider('回复随机度', _temperature, 0.0, 1.5, (v) => _temperature = v),
                 _slider('最大长度', _maxTokens.toDouble(), 100, 2000, (v) => _maxTokens = v.toInt()),
@@ -135,6 +172,32 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
             ),
     );
   }
+
+  Widget _selfModeTile() => SwitchListTile(
+        value: _selfMode,
+        onChanged: (v) => setState(() => _selfMode = v),
+        title: const Text('启用自主模式'),
+        subtitle: const Text('需先在上方启用 AI；决定哪些消息触发 AI 回复'),
+      );
+
+  Widget _triggerTile(IconData icon, String title, bool value, void Function(bool) onchg) => SwitchListTile(
+        value: value,
+        onChanged: onchg,
+        secondary: Icon(icon),
+        title: Text(title),
+      );
+
+  Widget _keywordField() => Padding(
+        padding: const EdgeInsets.symmetric(vertical: 6),
+        child: TextField(
+          controller: TextEditingController(text: _keywords),
+          decoration: const InputDecoration(
+            labelText: '触发关键词（逗号分隔）',
+            hintText: 'koko, 哈哈, 在吗',
+          ),
+          onChanged: (v) => _keywords = v,
+        ),
+      );
 
   Widget _section(String title) => Padding(
         padding: const EdgeInsets.only(top: 8, bottom: 8, left: 4),
