@@ -8,6 +8,7 @@ import 'pages/actions_page.dart';
 import 'pages/home_page.dart';
 import 'pages/login_page.dart';
 import 'pages/logs_page.dart';
+import 'pages/root_shell.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -54,7 +55,7 @@ class RootView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final state = context.watch<AppState>();
-    return state.connected ? const HomePage() : const LoginPage(onConnected: _noop);
+    return state.connected ? const RootShell() : const LoginPage(onConnected: _noop);
   }
 
   static void _noop() {}
