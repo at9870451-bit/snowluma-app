@@ -114,7 +114,7 @@ class _VncPageState extends State<VncPage> {
                       filled: true,
                       fillColor: const Color(0xFF2A2C36),
                       border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10),
+                        borderRadius: const BorderRadius.all(Radius.circular(10)),
                         borderSide: BorderSide.none,
                       ),
                     ),
@@ -130,7 +130,7 @@ class _VncPageState extends State<VncPage> {
                       filled: true,
                       fillColor: const Color(0xFF2A2C36),
                       border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10),
+                        borderRadius: const BorderRadius.all(Radius.circular(10)),
                         borderSide: BorderSide.none,
                       ),
                     ),
