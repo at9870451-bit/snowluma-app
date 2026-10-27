@@ -61,8 +61,17 @@ class _ProcessesPageState extends State<ProcessesPage> {
           r = await api.processRefresh(id);
       }
       if (!mounted) return;
+      // 中文友好提示（原来直接把 API 的 success=true 原始字段显示出来，看不懂）
+      final ok = r['success'] == true || r['status'] == 'ok' || r['ok'] == true;
+      final label = action == 'load' ? '载入' : (action == 'unload' ? '卸载' : '刷新');
+      final detail = (r['message'] ?? r['msg'] ?? '').toString();
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('$action: ${_brief(r)}')),
+        SnackBar(
+          content: Text(ok
+              ? '$label成功${detail.isNotEmpty ? '：$detail' : ''}'
+              : '$label失败${detail.isNotEmpty ? '：$detail' : ''}'),
+          backgroundColor: ok ? null : Colors.red.shade600,
+        ),
       );
       _refresh();
     } catch (e) {
@@ -70,14 +79,6 @@ class _ProcessesPageState extends State<ProcessesPage> {
       ScaffoldMessenger.of(context)
           .showSnackBar(SnackBar(content: Text('操作失败：$e')));
     }
-  }
-
-  String _brief(Map<String, dynamic> r) {
-    final parts = <String>[];
-    for (final k in ['message', 'status', 'success'].take(3)) {
-      if (r[k] != null) parts.add('$k=${r[k]}');
-    }
-    return parts.join(' ');
   }
 
   @override
