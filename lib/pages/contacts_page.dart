@@ -184,9 +184,11 @@ class _ContactsPageState extends State<ContactsPage> {
     final members = (g['member_count'] ?? g['max_member_count'] ?? '')
         .toString();
     return ListTile(
-      leading: CircleAvatar(
-        backgroundColor: Colors.blue.withValues(alpha: 0.15),
-        child: Icon(Icons.groups, color: Colors.blue.shade600, size: 20),
+      leading: _NetAvatar(
+        // 腾讯官方群头像
+        url: 'https://p.qlogo.cn/gh/$id/$id/100',
+        fallbackText: name,
+        color: Colors.blue,
       ),
       title: Text(name, maxLines: 1, overflow: TextOverflow.ellipsis),
       subtitle: Text('群号 $id${members.isNotEmpty ? ' · 成员 $members' : ''}',
@@ -200,14 +202,60 @@ class _ContactsPageState extends State<ContactsPage> {
     final nick = (f['nickname'] ?? f['remark'] ?? f['name'] ?? '未知').toString();
     final id = (f['user_id'] ?? '').toString();
     return ListTile(
-      leading: CircleAvatar(
-        backgroundColor: Colors.green.withValues(alpha: 0.15),
-        child: Text(nick.isNotEmpty ? nick[0] : '?',
-            style: TextStyle(color: Colors.green.shade600)),
+      leading: _NetAvatar(
+        // 腾讯官方 QQ 头像
+        url: 'https://q1.qlogo.cn/g?b=qq&nk=$id&s=100',
+        fallbackText: nick,
+        color: Colors.green,
       ),
       title: Text(nick, maxLines: 1, overflow: TextOverflow.ellipsis),
       subtitle: Text('QQ $id', style: text.bodySmall),
       dense: true,
+    );
+  }
+}
+
+/// 网络头像：加载中显示字母占位，失败回退字母头像
+class _NetAvatar extends StatelessWidget {
+  const _NetAvatar({
+    required this.url,
+    required this.fallbackText,
+    required this.color,
+  });
+
+  final String url;
+  final String fallbackText;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 40,
+      height: 40,
+      child: ClipOval(
+        child: Image.network(
+          url,
+          width: 40,
+          height: 40,
+          fit: BoxFit.cover,
+          loadingBuilder: (context, child, progress) =>
+              progress == null ? child : _letter(),
+          errorBuilder: (context, error, stack) => _letter(),
+        ),
+      ),
+    );
+  }
+
+  Widget _letter() {
+    final ch = fallbackText.isNotEmpty ? fallbackText[0] : '?';
+    return Container(
+      width: 40,
+      height: 40,
+      color: color.withValues(alpha: 0.15),
+      alignment: Alignment.center,
+      child: Text(ch,
+          style: TextStyle(
+              color: color, fontSize: 17, fontWeight: FontWeight.w600)),
     );
   }
 }
