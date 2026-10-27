@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
@@ -79,6 +80,122 @@ class _VncPageState extends State<VncPage> {
 })();
 ''';
     _web.runJavaScript(js);
+  }
+
+  /// 账号密码登录：弹窗输入 QQ 号+密码 -> POST 到服务器 -> xdotool 模拟鼠标输入
+  Future<void> _qqPwdLogin() async {
+    final uinCtl = TextEditingController();
+    final pwdCtl = TextEditingController();
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDlg) {
+          bool loading = false;
+          String msg = '';
+          return AlertDialog(
+            backgroundColor: const Color(0xFF1D1E24),
+            title: const Text('QQ 账号密码登录',
+                style: TextStyle(color: Colors.white, fontSize: 16)),
+            content: SizedBox(
+              width: 320,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextField(
+                    controller: uinCtl,
+                    style: const TextStyle(color: Colors.white, fontSize: 14),
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(
+                      labelText: 'QQ 号',
+                      labelStyle: TextStyle(color: Colors.white54),
+                      hintText: '输入 QQ 号码',
+                      hintStyle: TextStyle(color: Colors.white24),
+                      filled: true,
+                      fillColor: const Color(0xFF2A2C36),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        borderSide: BorderSide.none,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: pwdCtl,
+                    obscureText: true,
+                    style: const TextStyle(color: Colors.white, fontSize: 14),
+                    decoration: const InputDecoration(
+                      labelText: '密码',
+                      labelStyle: TextStyle(color: Colors.white54),
+                      filled: true,
+                      fillColor: const Color(0xFF2A2C36),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        borderSide: BorderSide.none,
+                      ),
+                    ),
+                  ),
+                  if (msg.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 10),
+                      child: Text(msg,
+                          style: const TextStyle(color: Colors.white70, fontSize: 12),
+                          maxLines: 3),
+                    ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('取消', style: TextStyle(color: Colors.white54)),
+              ),
+              FilledButton(
+                onPressed: loading
+                    ? null
+                    : () async {
+                        setDlg(() {
+                          loading = true;
+                          msg = '正在登录…';
+                        });
+                        try {
+                          final r = await http.post(
+                            Uri.parse('https://www.daykai.asia/qq/login'),
+                            headers: {'Content-Type': 'application/json'},
+                            body: jsonEncode({
+                              'uin': uinCtl.text.trim(),
+                              'password': pwdCtl.text,
+                            }),
+                          ).timeout(const Duration(seconds: 35));
+                          final j = jsonDecode(r.body) as Map;
+                          setDlg(() {
+                            msg = j['ok'] == true
+                                ? '✅ 已输入并点击登录，请看画面状态'
+                                : '❌ ${j['msg'] ?? '失败'}';
+                            loading = false;
+                          });
+                        } catch (e) {
+                          setDlg(() {
+                            msg = '❌ 请求失败: $e';
+                            loading = false;
+                          });
+                        }
+                      },
+                child: loading
+                    ? const SizedBox(
+                        width: 14,
+                        height: 14,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Text('登录'),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+    uinCtl.dispose();
+    pwdCtl.dispose();
   }
 
   /// 强制刷新：通知服务器点击 QQ 的「刷新」重新生成二维码
@@ -171,11 +288,16 @@ class _VncPageState extends State<VncPage> {
                     const SizedBox(width: 6),
                     Expanded(
                       child: Text(
-                        '下方为 QQ 登录界面实时画面（含二维码，可点按操作）',
-                        style: TextStyle(fontSize: 12, color: Colors.white70),
+                        'QQ 登录界面实时画面',
+                        style: const TextStyle(fontSize: 12, color: Colors.white70),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
+                    ),
+                    IconButton(
+                      onPressed: _qqPwdLogin,
+                      icon: const Icon(Icons.lock_open, size: 18, color: Colors.white70),
+                      tooltip: '账号密码登录',
                     ),
                     IconButton(
                       onPressed: _forceRefreshQr,
