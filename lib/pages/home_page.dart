@@ -6,6 +6,7 @@ import 'actions_page.dart';
 import 'login_page.dart';
 import 'processes_page.dart';
 import 'vnc_page.dart';
+import 'ai_settings_page.dart';
 import 'logs_page.dart';
 
 /// 主页 — 服务状态 + QQ 账号列表 + 动作/日志入口
@@ -232,6 +233,16 @@ class _HomePageState extends State<HomePage> {
               },
               icon: const Icon(Icons.dns_outlined, size: 18),
               label: const Text('进程 / 账号管理'),
+            ),
+            const SizedBox(height: 8),
+            TextButton.icon(
+              onPressed: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const AiSettingsPage()),
+                );
+              },
+              icon: const Icon(Icons.smart_toy_outlined, size: 18),
+              label: const Text('AI 助手设置'),
             ),
           ],
         ),
