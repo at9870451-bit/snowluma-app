@@ -48,6 +48,12 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
   int _memoryTurns = 8;        // 记忆轮数
   int _chatCount = 0;          // 已学习条数
 
+  // ---- 话痨连发 / 随机@ / 主动发言 ----
+  int _multiRate = 0;          // 话痨连发概率 %
+  int _multiMax = 3;           // 连发最多条数
+  int _chattyAtRate = 0;       // 连发时随机 @ 他人概率 %
+  int _idleActiveRate = 0;     // 主动发言概率 %（5分钟每群最多1次）
+
   @override
   void initState() {
     super.initState();
@@ -78,6 +84,10 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
     _learnFromChat = c['learnFromChat'] != false;
     _memoryMode = c['memoryMode'] != false;
     _memoryTurns = (c['memoryTurns'] as num?)?.toInt() ?? 8;
+    _multiRate = (c['multiRate'] as num?)?.toInt() ?? 0;
+    _multiMax = (c['multiMax'] as num?)?.toInt() ?? 3;
+    _chattyAtRate = (c['chattyAtRate'] as num?)?.toInt() ?? 0;
+    _idleActiveRate = (c['idleActiveRate'] as num?)?.toInt() ?? 0;
     _chatCount = chatCount;
   }
 
@@ -141,6 +151,10 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
         'learnFromChat': _learnFromChat,
         'memoryMode': _memoryMode,
         'memoryTurns': _memoryTurns,
+        'multiRate': _multiRate,
+        'multiMax': _multiMax,
+        'chattyAtRate': _chattyAtRate,
+        'idleActiveRate': _idleActiveRate,
       });
       if (r['ok'] == true && r['config'] is Map) {
         _cachedConfig = (r['config'] as Map).cast<String, dynamic>();
@@ -224,6 +238,12 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
                       ],
                     ),
                   ),
+                _section('话痨连发 · 随机@ · 主动发言'),
+                _numField('连发概率 %（0=关，命中后回复拆成多条单行连发）', _multiRate, 0, 100, (v) => _multiRate = v),
+                _numField('连发最多条数', _multiMax, 2, 5, (v) => _multiMax = v),
+                _numField('连发时随机 @ 群里其他人概率 %', _chattyAtRate, 0, 100, (v) => _chattyAtRate = v),
+                _numField('主动发言概率 %（收到群消息时按概率插话，5分钟每群最多1次）', _idleActiveRate, 0, 100, (v) => _idleActiveRate = v),
+                const SizedBox(height: 4),
                 _section('参数'),
                 _slider('回复随机度', _temperature, 0.0, 1.5, (v) => _temperature = v),
                 _slider('最大长度', _maxTokens.toDouble(), 100, 2000, (v) => _maxTokens = v.toInt()),
@@ -368,6 +388,24 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
         obscureText: obscure,
         decoration: InputDecoration(labelText: label, hintText: hint),
         onChanged: onchg,
+      ),
+    );
+  }
+
+  Widget _numField(String label, int value, int min, int max,
+      void Function(int) onchg) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: TextFormField(
+        initialValue: '$value',
+        keyboardType: TextInputType.number,
+        decoration: InputDecoration(labelText: label, isDense: true),
+        onChanged: (v) {
+          final n = int.tryParse(v.trim());
+          if (n != null) {
+            onchg(n < min ? min : (n > max ? max : n));
+          }
+        },
       ),
     );
   }
