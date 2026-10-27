@@ -7,6 +7,7 @@ import 'login_page.dart';
 import 'processes_page.dart';
 import 'vnc_page.dart';
 import 'ai_settings_page.dart';
+import 'contacts_page.dart';
 import 'logs_page.dart';
 
 /// 主页 — 服务状态 + QQ 账号列表 + 动作/日志入口
@@ -123,6 +124,24 @@ class _HomePageState extends State<HomePage> {
         child: Column(
           children: [
             _statusCard(context, text),
+            // 联系人入口：当前 QQ 账号已加入的群聊 + 好友
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 0, 12, 4),
+              child: Card(
+                margin: EdgeInsets.zero,
+                child: ListTile(
+                  leading: const Icon(Icons.people_alt_outlined,
+                      color: Colors.blue),
+                  title: const Text('我的群聊和好友'),
+                  subtitle: const Text('查看当前 QQ 账号已添加的群聊与好友'),
+                  trailing: const Icon(Icons.chevron_right),
+                  dense: true,
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const ContactsPage()),
+                  ),
+                ),
+              ),
+            ),
             if (_err != null)
               Padding(
                 padding: const EdgeInsets.all(12),
