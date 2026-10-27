@@ -54,6 +54,13 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
   int _chattyAtRate = 0;       // 连发时随机 @ 他人概率 %
   int _idleActiveRate = 0;     // 主动发言概率 %（5分钟每群最多1次）
 
+  // ---- 主动开话题（冷场检查）----
+  int _idleInterval = 30;      // 冷场检查间隔（分钟）
+  int _idleProb = 60;          // 开口概率 %
+  int _idleActiveWindow = 90;  // 群活跃判定窗口（分钟）
+  int _idleMaxChars = 60;      // 话题长度上限
+  bool _idleSaving = false;
+
   @override
   void initState() {
     super.initState();
@@ -111,10 +118,51 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
       _cachedConfig = c;
       _cachedChatCount = chatCount;
       setState(() => _applyConfig(c, chatCount));
+      // 主动开话题（冷场检查）配置（QQBot idle_talk）
+      try {
+        final ir = await api.idleTalk();
+        final ic = (ir['config'] as Map?)?.cast<String, dynamic>() ?? {};
+        if (mounted) {
+          setState(() {
+            _idleInterval = (ic['interval_minutes'] as num?)?.toInt() ?? 30;
+            _idleProb = ((ic['speak_probability'] as num?)?.toDouble() ?? 0.6 * 100).round();
+            _idleActiveWindow = (ic['active_within_minutes'] as num?)?.toInt() ?? 90;
+            _idleMaxChars = (ic['max_chars'] as num?)?.toInt() ?? 60;
+          });
+        }
+      } catch (_) {}
     } catch (e) {
       setState(() => _message = '加载失败：$e');
     } finally {
       setState(() => _loading = false);
+    }
+  }
+
+  /// 保存主动开话题（冷场检查）设置 → /ai/idle-talk（保存后 QQBot 自动重启生效）
+  Future<void> _saveIdle() async {
+    setState(() {
+      _idleSaving = true;
+      _message = '';
+    });
+    try {
+      final api = _api();
+      if (api == null) {
+        setState(() => _message = '未登录，无法保存');
+        return;
+      }
+      final r = await api.saveIdleTalk({
+        'interval_minutes': _idleInterval,
+        'speak_probability': _idleProb / 100.0,
+        'active_within_minutes': _idleActiveWindow,
+        'max_chars': _idleMaxChars,
+      });
+      setState(() => _message = r['ok'] == true
+          ? '开话题设置已保存，QQBot 已重启生效'
+          : '${r['msg'] ?? '保存失败'}');
+    } catch (e) {
+      setState(() => _message = '保存失败：$e');
+    } finally {
+      setState(() => _idleSaving = false);
     }
   }
 
@@ -243,6 +291,31 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
                 _numField('连发最多条数', _multiMax, 2, 5, (v) => _multiMax = v),
                 _numField('连发时随机 @ 群里其他人概率 %', _chattyAtRate, 0, 100, (v) => _chattyAtRate = v),
                 _numField('主动发言概率 %（收到群消息时按概率插话，5分钟每群最多1次）', _idleActiveRate, 0, 100, (v) => _idleActiveRate = v),
+                const SizedBox(height: 4),
+                _section('主动开话题 · 冷场检查'),
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 8, left: 4),
+                  child: Text(
+                    '群里冷场时 AI 主动开话题：每隔「检查间隔」分钟看一次，群在「活跃窗口」内有人说话才开口（避免打扰安静群），按「开口概率」抽签命中就主动发一条。',
+                    style: text.bodySmall?.copyWith(color: Colors.grey.shade600),
+                  ),
+                ),
+                _numField('冷场检查间隔（分钟）', _idleInterval, 5, 720, (v) => _idleInterval = v),
+                _numField('开口概率（%）', _idleProb, 0, 100, (v) => _idleProb = v),
+                _numField('群活跃判定窗口（分钟）', _idleActiveWindow, 5, 1440, (v) => _idleActiveWindow = v),
+                _numField('话题长度上限（字）', _idleMaxChars, 10, 200, (v) => _idleMaxChars = v),
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 6),
+                  child: OutlinedButton.icon(
+                    onPressed: _idleSaving ? null : _saveIdle,
+                    icon: _idleSaving
+                        ? const SizedBox(
+                            width: 16, height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2))
+                        : const Icon(Icons.timer_outlined, size: 18),
+                    label: const Text('保存开话题设置（QQBot 自动重启生效）'),
+                  ),
+                ),
                 const SizedBox(height: 4),
                 _section('参数'),
                 _slider('回复随机度', _temperature, 0.0, 1.5, (v) => _temperature = v),
