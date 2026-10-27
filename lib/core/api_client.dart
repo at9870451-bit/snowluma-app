@@ -229,4 +229,12 @@ class SnowLumaApiClient {
     ).timeout(const Duration(seconds: 8));
     return _json(resp.body);
   }
+
+  /// 联系人列表：GET /ai/contacts → {groups, friends, groupsCount, friendsCount}
+  Future<Map<String, dynamic>> contacts() async {
+    final resp = await http
+        .get(_uri('/ai/contacts'))
+        .timeout(const Duration(seconds: 12));
+    return _json(resp.body);
+  }
 }
