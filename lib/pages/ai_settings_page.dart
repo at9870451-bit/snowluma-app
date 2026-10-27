@@ -15,6 +15,10 @@ class AiSettingsPage extends StatefulWidget {
 }
 
 class _AiSettingsPageState extends State<AiSettingsPage> {
+  /// 上次成功的配置缓存：进入页面先秒显，再后台刷新（降低感知延迟）
+  static Map<String, dynamic>? _cachedConfig;
+  static int _cachedChatCount = 0;
+
   bool _loading = true;
   bool _saving = false;
   String _message = '';
@@ -50,8 +54,37 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
 
   SnowLumaApiClient? _api() => appState.client;
 
+  void _applyConfig(Map<String, dynamic> c, int chatCount) {
+    _enabled = c['enabled'] == true;
+    _apiKey = (c['apiKey'] as String?) ?? '';
+    _baseUrl = (c['baseUrl'] as String?) ?? _baseUrl;
+    _model = (c['model'] as String?) ?? _model;
+    _persona = (c['persona'] as String?) ?? '';
+    _replyStyle = (c['replyStyle'] as String?) ?? 'human';
+    _age = (c['age'] as String?) ?? '';
+    _gender = (c['gender'] as String?) ?? '';
+    _masterUin = (c['masterUin'] as String?) ?? '';
+    _temperature = ((c['temperature'] as num?)?.toDouble()) ?? 0.7;
+    _maxTokens = (c['maxTokens'] as num?)?.toInt() ?? 500;
+    _selfMode = c['selfMode'] == true;
+    _triggerPoke = c['triggerPoke'] != false;
+    _triggerAt = c['triggerAt'] != false;
+    _triggerRandom = c['triggerRandom'] == true;
+    _randomRate = (c['randomRate'] as num?)?.toInt() ?? 10;
+    _keywords = (c['keywords'] as String?) ?? '';
+    _skipAtOthers = c['skipAtOthers'] != false;
+    _learnFromChat = c['learnFromChat'] != false;
+    _chatCount = chatCount;
+  }
+
   Future<void> _load() async {
-    setState(() => _loading = true);
+    // 命中缓存：立即渲染，不阻塞界面
+    if (_cachedConfig != null) {
+      _applyConfig(_cachedConfig!, _cachedChatCount);
+      setState(() => _loading = false);
+    } else {
+      setState(() => _loading = true);
+    }
     try {
       final api = _api();
       if (api == null) {
@@ -60,28 +93,10 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
       }
       final r = await api.aiConfig();
       final c = (r['config'] as Map?)?.cast<String, dynamic>() ?? <String, dynamic>{};
-      setState(() {
-        _enabled = c['enabled'] == true;
-        _apiKey = (c['apiKey'] as String?) ?? '';
-        _baseUrl = (c['baseUrl'] as String?) ?? _baseUrl;
-        _model = (c['model'] as String?) ?? _model;
-        _persona = (c['persona'] as String?) ?? '';
-        _replyStyle = (c['replyStyle'] as String?) ?? 'human';
-        _age = (c['age'] as String?) ?? '';
-        _gender = (c['gender'] as String?) ?? '';
-        _masterUin = (c['masterUin'] as String?) ?? '';
-        _temperature = ((c['temperature'] as num?)?.toDouble()) ?? 0.7;
-        _maxTokens = (c['maxTokens'] as num?)?.toInt() ?? 500;
-        _selfMode = c['selfMode'] == true;
-        _triggerPoke = c['triggerPoke'] != false;
-        _triggerAt = c['triggerAt'] != false;
-        _triggerRandom = c['triggerRandom'] == true;
-        _randomRate = (c['randomRate'] as num?)?.toInt() ?? 10;
-        _keywords = (c['keywords'] as String?) ?? '';
-        _skipAtOthers = c['skipAtOthers'] != false;
-        _learnFromChat = c['learnFromChat'] != false;
-        _chatCount = (r['chatCount'] as num?)?.toInt() ?? 0;
-      });
+      final chatCount = (r['chatCount'] as num?)?.toInt() ?? 0;
+      _cachedConfig = c;
+      _cachedChatCount = chatCount;
+      setState(() => _applyConfig(c, chatCount));
     } catch (e) {
       setState(() => _message = '加载失败：$e');
     } finally {
@@ -121,6 +136,9 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
         'skipAtOthers': _skipAtOthers,
         'learnFromChat': _learnFromChat,
       });
+      if (r['ok'] == true && r['config'] is Map) {
+        _cachedConfig = (r['config'] as Map).cast<String, dynamic>();
+      }
       setState(() =>
           _message = r['ok'] == true ? '已保存，AI 助手${_enabled ? '已启用' : '已关闭'}' : '${r['msg'] ?? '保存失败'}');
     } catch (e) {
