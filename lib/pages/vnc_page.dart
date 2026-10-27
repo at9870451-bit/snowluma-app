@@ -35,7 +35,6 @@ class _VncPageState extends State<VncPage> {
     // HTTPS 域名（Let's Encrypt 正式证书 + nginx 反代 WebSocket）
     const host = 'www.daykai.asia';
     _vncUrl = 'https://$host/novnc/vnc.html?autoconnect=true';
-    _qrUrl = 'https://$host/qr.png'; // 强制刷新用
     _qrTimer = Timer.periodic(const Duration(seconds: 30), (_) {
       setState(() => _qrTick++); // 触发二维码图刷新
     });
@@ -85,7 +84,7 @@ class _VncPageState extends State<VncPage> {
   /// 强制刷新：通知服务器点击 QQ 的「刷新」重新生成二维码
   Future<void> _forceRefreshQr() async {
     try {
-      await http.get(Uri.parse('$_qrUrl?refresh=1')).timeout(const Duration(seconds: 60));
+      await http.get(Uri.parse('https://www.daykai.asia/qr.png?refresh=1')).timeout(const Duration(seconds: 60));
     } catch (_) {}
     if (mounted) setState(() => _qrTick++);
   }
