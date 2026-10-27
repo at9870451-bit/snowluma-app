@@ -237,4 +237,25 @@ class SnowLumaApiClient {
         .timeout(const Duration(seconds: 12));
     return _json(resp.body);
   }
+
+  /// 聊天范围白名单：GET /ai/chat-scope → {groups, friends}
+  Future<Map<String, dynamic>> chatScope() async {
+    final resp = await http
+        .get(_uri('/ai/chat-scope'))
+        .timeout(const Duration(seconds: 8));
+    return _json(resp.body);
+  }
+
+  /// 保存聊天范围：POST /ai/chat-scope {groups, friends}
+  Future<Map<String, dynamic>> saveChatScope({
+    required List<String> groups,
+    required List<String> friends,
+  }) async {
+    final resp = await _client.post(
+      _uri('/ai/chat-scope'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({'groups': groups, 'friends': friends}),
+    ).timeout(const Duration(seconds: 8));
+    return _json(resp.body);
+  }
 }
