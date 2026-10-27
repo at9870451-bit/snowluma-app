@@ -27,6 +27,7 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
   String _model = 'deepseek-chat';
   String _persona = '';
   String _replyStyle = 'human'; // human=简短真人感, ai=AI感
+  String _masterUin = '';   // 主人 QQ 号（逗号分隔可多个）
   double _temperature = 0.7;
   int _maxTokens = 500;
 
@@ -64,6 +65,7 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
         _model = (c['model'] as String?) ?? _model;
         _persona = (c['persona'] as String?) ?? '';
         _replyStyle = (c['replyStyle'] as String?) ?? 'human';
+        _masterUin = (c['masterUin'] as String?) ?? '';
         _temperature = ((c['temperature'] as num?)?.toDouble()) ?? 0.7;
         _maxTokens = (c['maxTokens'] as num?)?.toInt() ?? 500;
         _selfMode = c['selfMode'] == true;
@@ -99,6 +101,7 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
         'model': _model.trim(),
         'persona': _persona.trim(),
         'replyStyle': _replyStyle,
+        'masterUin': _masterUin.trim(),
         'temperature': _temperature,
         'maxTokens': _maxTokens,
         'selfMode': _selfMode,
@@ -142,6 +145,8 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
                 _personaField(),
                 _section('回复风格'),
                 _styleTile(),
+                _section('主人权限'),
+                _masterField(),
                 _section('自主模式'),
                 _selfModeTile(),
                 _triggerTile(Icons.touch_app_outlined, '被戳一戳时', _triggerPoke, (v) => _triggerPoke = v),
@@ -233,6 +238,29 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
         onChanged: onchg,
         secondary: Icon(icon),
         title: Text(title),
+      );
+
+  Widget _masterField() => Padding(
+        padding: const EdgeInsets.symmetric(vertical: 6),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            TextField(
+              controller: TextEditingController(text: _masterUin),
+              decoration: const InputDecoration(
+                labelText: '主人 QQ 号（逗号分隔可多个）',
+                hintText: '如 123456789',
+                prefixIcon: Icon(Icons.admin_panel_settings_outlined),
+              ),
+              onChanged: (v) => _masterUin = v,
+            ),
+            const Padding(
+              padding: EdgeInsets.only(left: 4, top: 4),
+              child: Text('主人发的消息必回；主人可发管理指令（/status /ai on /ai off /style human|ai /help）；非主人不能发指令。',
+                  style: TextStyle(fontSize: 11, color: Colors.grey)),
+            ),
+          ],
+        ),
       );
 
   Widget _keywordField() => Padding(
