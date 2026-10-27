@@ -10,6 +10,7 @@ import '../core/api_client.dart';
 /// 配置 SnowLuma AI 网关：启用开关、OpenAI 兼容接口、模型、人设（persona）。
 /// 人设内容会注入到每次 AI 回复的 system prompt，让 QQ 自动回复符合人设。
 class AiSettingsPage extends StatefulWidget {
+  const AiSettingsPage({super.key});
 
   @override
   State<AiSettingsPage> createState() => _AiSettingsPageState();
