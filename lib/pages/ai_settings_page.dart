@@ -39,6 +39,8 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
   int _randomRate = 10;
   String _keywords = '';
   bool _skipAtOthers = true;
+  bool _learnFromChat = true;  // 学习真人聊天（防 AI 感）
+  int _chatCount = 0;          // 已学习条数
 
   @override
   void initState() {
@@ -77,6 +79,8 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
         _randomRate = (c['randomRate'] as num?)?.toInt() ?? 10;
         _keywords = (c['keywords'] as String?) ?? '';
         _skipAtOthers = c['skipAtOthers'] != false;
+        _learnFromChat = c['learnFromChat'] != false;
+        _chatCount = (r['chatCount'] as num?)?.toInt() ?? 0;
       });
     } catch (e) {
       setState(() => _message = '加载失败：$e');
@@ -115,6 +119,7 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
         'randomRate': _randomRate,
         'keywords': _keywords.trim(),
         'skipAtOthers': _skipAtOthers,
+        'learnFromChat': _learnFromChat,
       });
       setState(() =>
           _message = r['ok'] == true ? '已保存，AI 助手${_enabled ? '已启用' : '已关闭'}' : '${r['msg'] ?? '保存失败'}');
@@ -165,6 +170,14 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
                   padding: EdgeInsets.only(left: 4, bottom: 4),
                   child: Text('@了本人必回；未启用自主模式时群消息默认全部回复。',
                       style: TextStyle(fontSize: 11, color: Colors.grey)),
+                ),
+                _section('学习与防 AI 感'),
+                _triggerTile(Icons.school_outlined, '学习真人聊天（越聊越像真人）', _learnFromChat,
+                    (v) => setState(() => _learnFromChat = v)),
+                Padding(
+                  padding: const EdgeInsets.only(left: 4, bottom: 8),
+                  child: Text('已学习语料：$_chatCount 条真实聊天（自动记录他人消息）',
+                      style: const TextStyle(fontSize: 11, color: Colors.grey)),
                 ),
                 _section('参数'),
                 _slider('回复随机度', _temperature, 0.0, 1.5, (v) => _temperature = v),
@@ -250,8 +263,8 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            TextField(
-              controller: TextEditingController(text: _masterUin),
+            TextFormField(
+              initialValue: _masterUin,
               decoration: const InputDecoration(
                 labelText: '主人 QQ 号（逗号分隔可多个）',
                 hintText: '如 123456789',
@@ -270,8 +283,8 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
 
   Widget _keywordField() => Padding(
         padding: const EdgeInsets.symmetric(vertical: 6),
-        child: TextField(
-          controller: TextEditingController(text: _keywords),
+        child: TextFormField(
+          initialValue: _keywords,
           decoration: const InputDecoration(
             labelText: '触发关键词（逗号分隔）',
             hintText: 'koko, 哈哈, 在吗',
@@ -290,8 +303,8 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
       {String? hint, bool obscure = false}) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6),
-      child: TextField(
-        controller: TextEditingController(text: value),
+      child: TextFormField(
+        initialValue: value,
         obscureText: obscure,
         decoration: InputDecoration(labelText: label, hintText: hint),
         onChanged: onchg,
@@ -305,9 +318,9 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          TextField(
+          TextFormField(
+            initialValue: _persona,
             maxLines: 5,
-            controller: TextEditingController(text: _persona),
             decoration: const InputDecoration(
               labelText: '人设描述',
               alignLabelWithHint: true,
@@ -316,12 +329,10 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
             onChanged: (v) => _persona = v,
           ),
           const SizedBox(height: 6),
-          TextButton(
-            onPressed: () {
-              final c = TextEditingController(text: _persona);
-              setState(() => _persona = c.text);
-            },
-            child: const Text('加载已保存的人设'),
+          TextButton.icon(
+            onPressed: _load,
+            icon: const Icon(Icons.cloud_download_outlined, size: 16),
+            label: const Text('从服务器重新读取配置'),
           ),
           const Text('提示：人设内容会在每次 AI 回复时作为系统指令注入，决定 QQ 自动回复的语气与行为。',
               style: TextStyle(fontSize: 11, color: Colors.grey)),
@@ -335,8 +346,8 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
         child: Row(
           children: [
             Expanded(
-              child: TextField(
-                controller: TextEditingController(text: _age),
+              child: TextFormField(
+                initialValue: _age,
                 keyboardType: TextInputType.number,
                 decoration: const InputDecoration(
                   labelText: '年龄',
