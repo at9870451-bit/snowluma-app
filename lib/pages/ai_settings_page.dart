@@ -44,6 +44,8 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
   String _keywords = '';
   bool _skipAtOthers = true;
   bool _learnFromChat = true;  // 学习真人聊天（防 AI 感）
+  bool _memoryMode = true;     // 群聊记忆
+  int _memoryTurns = 8;        // 记忆轮数
   int _chatCount = 0;          // 已学习条数
 
   @override
@@ -74,6 +76,8 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
     _keywords = (c['keywords'] as String?) ?? '';
     _skipAtOthers = c['skipAtOthers'] != false;
     _learnFromChat = c['learnFromChat'] != false;
+    _memoryMode = c['memoryMode'] != false;
+    _memoryTurns = (c['memoryTurns'] as num?)?.toInt() ?? 8;
     _chatCount = chatCount;
   }
 
@@ -135,6 +139,8 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
         'keywords': _keywords.trim(),
         'skipAtOthers': _skipAtOthers,
         'learnFromChat': _learnFromChat,
+        'memoryMode': _memoryMode,
+        'memoryTurns': _memoryTurns,
       });
       if (r['ok'] == true && r['config'] is Map) {
         _cachedConfig = (r['config'] as Map).cast<String, dynamic>();
@@ -197,6 +203,27 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
                   child: Text('已学习语料：$_chatCount 条真实聊天（自动记录他人消息）',
                       style: const TextStyle(fontSize: 11, color: Colors.grey)),
                 ),
+                _triggerTile(Icons.psychology_outlined, '群聊记忆（记得刚才聊了什么）', _memoryMode,
+                    (v) => setState(() => _memoryMode = v)),
+                if (_memoryMode)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: TextFormField(
+                            initialValue: '$_memoryTurns',
+                            keyboardType: TextInputType.number,
+                            decoration: const InputDecoration(
+                              labelText: '记忆轮数（1 轮 = 一问一答）',
+                              isDense: true,
+                            ),
+                            onChanged: (v) => _memoryTurns = int.tryParse(v.trim()) ?? 8,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 _section('参数'),
                 _slider('回复随机度', _temperature, 0.0, 1.5, (v) => _temperature = v),
                 _slider('最大长度', _maxTokens.toDouble(), 100, 2000, (v) => _maxTokens = v.toInt()),
