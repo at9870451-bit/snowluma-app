@@ -30,6 +30,15 @@ class _ContactsPageState extends State<ContactsPage> {
     });
     try {
       final api = appState.client;
+      if (api == null) {
+        if (mounted) {
+          setState(() {
+            _loading = false;
+            _err = '尚未连接服务器';
+          });
+        }
+        return;
+      }
       final r = await api.contacts();
       if (!mounted) return;
       setState(() {
