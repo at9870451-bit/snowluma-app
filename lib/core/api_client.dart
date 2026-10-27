@@ -208,4 +208,22 @@ class SnowLumaApiClient {
 
   Map<String, dynamic> _json(String body) =>
       (jsonDecode(body) as dynamic)?.cast<String, dynamic>() ?? {};
+
+  // ---- AI 网关（/ai/config，无需 Bearer）----
+
+  Future<Map<String, dynamic>> aiConfig() async {
+    final resp = await http
+        .get(_uri('/ai/config'))
+        .timeout(const Duration(seconds: 15));
+    return _json(resp.body);
+  }
+
+  Future<Map<String, dynamic>> aiSaveConfig(Map<String, dynamic> cfg) async {
+    final resp = await http.post(
+      _uri('/ai/config'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode(cfg),
+    ).timeout(const Duration(seconds: 15));
+    return _json(resp.body);
+  }
 }
