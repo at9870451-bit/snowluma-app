@@ -26,6 +26,7 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
   String _baseUrl = 'https://api.deepseek.com/v1';
   String _model = 'deepseek-chat';
   String _persona = '';
+  String _replyStyle = 'human'; // human=简短真人感, ai=AI感
   double _temperature = 0.7;
   int _maxTokens = 500;
 
@@ -62,6 +63,7 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
         _baseUrl = (c['baseUrl'] as String?) ?? _baseUrl;
         _model = (c['model'] as String?) ?? _model;
         _persona = (c['persona'] as String?) ?? '';
+        _replyStyle = (c['replyStyle'] as String?) ?? 'human';
         _temperature = ((c['temperature'] as num?)?.toDouble()) ?? 0.7;
         _maxTokens = (c['maxTokens'] as num?)?.toInt() ?? 500;
         _selfMode = c['selfMode'] == true;
@@ -96,6 +98,7 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
         'baseUrl': _baseUrl.trim(),
         'model': _model.trim(),
         'persona': _persona.trim(),
+        'replyStyle': _replyStyle,
         'temperature': _temperature,
         'maxTokens': _maxTokens,
         'selfMode': _selfMode,
@@ -137,6 +140,8 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
                 _field('API Key', _apiKey, (v) => _apiKey = v, obscure: true, hint: 'sk-…'),
                 _section('人设（Persona）'),
                 _personaField(),
+                _section('回复风格'),
+                _styleTile(),
                 _section('自主模式'),
                 _selfModeTile(),
                 _triggerTile(Icons.touch_app_outlined, '被戳一戳时', _triggerPoke, (v) => _triggerPoke = v),
@@ -172,6 +177,49 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
             ),
     );
   }
+
+  Widget _styleTile() => Padding(
+        padding: const EdgeInsets.symmetric(vertical: 4),
+        child: Row(
+          children: [
+            Expanded(
+              child: _styleChip('简短真人感', '像真人在 QQ 发消息：短句、口语、不客套', _replyStyle == 'human',
+                  () => setState(() => _replyStyle = 'human')),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: _styleChip('AI感', '完整、清晰、有条理，友好周到', _replyStyle == 'ai',
+                  () => setState(() => _replyStyle = 'ai')),
+            ),
+          ],
+        ),
+      );
+
+  Widget _styleChip(String title, String desc, bool selected, VoidCallback onTap) => InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 150),
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(
+            color: selected ? const Color(0x1F007AFF) : const Color(0xFFF5F5F7),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: selected ? const Color(0xFF007AFF) : Colors.transparent),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(title,
+                  style: TextStyle(
+                      color: selected ? const Color(0xFF007AFF) : const Color(0xFF1D1D1F),
+                      fontWeight: FontWeight.w600,
+                      fontSize: 13)),
+              const SizedBox(height: 3),
+              Text(desc, style: const TextStyle(color: Color(0xFF86868B), fontSize: 10.5)),
+            ],
+          ),
+        ),
+      );
 
   Widget _selfModeTile() => SwitchListTile(
         value: _selfMode,
