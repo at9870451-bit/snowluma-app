@@ -297,7 +297,10 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
                   padding: const EdgeInsets.only(bottom: 8, left: 4),
                   child: Text(
                     '群里冷场时 AI 主动开话题：每隔「检查间隔」分钟看一次，群在「活跃窗口」内有人说话才开口（避免打扰安静群），按「开口概率」抽签命中就主动发一条。',
-                    style: text.bodySmall?.copyWith(color: Colors.grey.shade600),
+                    style: Theme.of(context)
+                        .textTheme
+                        .bodySmall
+                        ?.copyWith(color: Colors.grey.shade600),
                   ),
                 ),
                 _numField('冷场检查间隔（分钟）', _idleInterval, 5, 720, (v) => _idleInterval = v),
