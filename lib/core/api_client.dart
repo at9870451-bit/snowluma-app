@@ -285,6 +285,7 @@ class SnowLumaApiClient {
     return _json(resp.body);
   }
 
-  /// 收藏表情包的图片 URL（经服务器直读 QQBot 表情库）
-  String stickerImageUrl(String file) => '$baseUrl/ai/sticker-image?file=$file';
+  /// 收藏表情包的图片 URL（w=300 缩略图，服务器 PIL 生成，几十 KB 秒开）
+  String stickerImageUrl(String file) =>
+      '$baseUrl/ai/sticker-image?file=$file&w=300';
 }
