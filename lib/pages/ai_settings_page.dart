@@ -78,6 +78,10 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
   bool _fetchingModels = false;
   List<String> _models = const [];
 
+  // ---- 接口方案 ----
+  List<Map<String, dynamic>> _profiles = const [];
+  String _activeProfile = '';
+
   // ---- 本地模型 / 外部接口 互斥开关 ----
   bool _useLocal = false;
   static const _localBase = 'http://127.0.0.1:11434/v1';
@@ -129,6 +133,11 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
     _visionResponseFormat = (c['visionResponseFormat'] as String?) ?? 'url';
     _chatCount = chatCount;
     _useLocal = _baseUrl.contains('127.0.0.1:11434');
+    _profiles = ((c['profiles'] as List?) ?? const [])
+        .whereType<Map>()
+        .map((m) => m.cast<String, dynamic>())
+        .toList();
+    _activeProfile = (c['activeProfile'] as String?) ?? '';
   }
 
   Future<void> _load() async {
@@ -251,6 +260,8 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
         'visionApiKey': _visionApiKey.trim(),
         'visionModel': _visionModel.trim(),
         'visionResponseFormat': _visionResponseFormat,
+        'profiles': _profiles,
+        'activeProfile': _activeProfile,
       });
       if (r['ok'] == true && r['config'] is Map) {
         _cachedConfig = (r['config'] as Map).cast<String, dynamic>();
