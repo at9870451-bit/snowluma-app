@@ -168,6 +168,7 @@ class _StickersPageState extends State<StickersPage> {
                 url,
                 width: double.infinity,
                 fit: BoxFit.cover,
+                cacheWidth: 400,
                 loadingBuilder: (context, child, progress) => progress == null
                     ? child
                     : const Center(
