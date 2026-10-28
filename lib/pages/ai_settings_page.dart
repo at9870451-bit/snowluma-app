@@ -78,6 +78,11 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
   bool _fetchingModels = false;
   List<String> _models = const [];
 
+  // ---- 本地模型 / 外部接口 互斥开关 ----
+  bool _useLocal = false; // true=服务器本地模型(ollama) false=外部接口
+  static const _localBase = 'http://127.0.0.1:11434/v1';
+  static const _localModel = 'qwen2.5:0.5b';
+
   // ---- 接口方案（多套模型/API 一键切换）----
   List<Map<String, dynamic>> _profiles = const [];
   String _activeProfile = '';
@@ -126,6 +131,7 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
     _visionApiKey = (c['visionApiKey'] as String?) ?? '';
     _visionModel = (c['visionModel'] as String?) ?? '';
     _visionResponseFormat = (c['visionResponseFormat'] as String?) ?? 'url';
+    _useLocal = (_baseUrl).contains('127.0.0.1:11434');
     _profiles = ((c['profiles'] as List?) ?? const [])
         .whereType<Map>()
         .map((m) => m.cast<String, dynamic>())
@@ -213,7 +219,7 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
         setState(() => _message = '未登录，无法保存');
         return;
       }
-      final r = await api.aiSaveConfig({
+      final r0payload = {
         'enabled': _enabled,
         'apiKey': _apiKey,
         'baseUrl': _baseUrl.trim(),
@@ -251,7 +257,55 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
         'visionResponseFormat': _visionResponseFormat,
         'profiles': _profiles,
         'activeProfile': _activeProfile,
-      });
+      };
+      if (_useLocal) {
+        // 本地模型开关：强制服务器本地 ollama 凭据
+        r0payload['baseUrl'] = _localBase;
+        r0payload['apiKey'] = 'ollama';
+        if (_model.trim().isEmpty || _model.trim() == 'deepseek-chat') {
+          r0payload['model'] = _localModel;
+        }
+        r0payload['activeProfile'] = '本地模型';
+      }
+      final r = await api.aiSaveConfig(r0payload);
+        'enabled': _enabled,
+        'apiKey': _apiKey,
+        'baseUrl': _baseUrl.trim(),
+        'model': _model.trim(),
+        'persona': _persona.trim(),
+        'replyStyle': _replyStyle,
+        'age': _age.trim(),
+        'gender': _gender,
+        'masterUin': _masterUin.trim(),
+        'temperature': _temperature,
+        'maxTokens': _maxTokens,
+        'selfMode': _selfMode,
+        'triggerPoke': _triggerPoke,
+        'triggerAt': _triggerAt,
+        'triggerRandom': _triggerRandom,
+        'randomRate': _randomRate,
+        'keywords': _keywords.trim(),
+        'skipAtOthers': _skipAtOthers,
+        'learnFromChat': _learnFromChat,
+        'memoryMode': _memoryMode,
+        'memoryTurns': _memoryTurns,
+        'multiRate': _multiRate,
+        'multiMax': _multiMax,
+        'chattyAtRate': _chattyAtRate,
+        'idleActiveRate': _idleActiveRate,
+        'voiceEnabled': _voiceEnabled,
+        'voiceBaseUrl': _voiceBaseUrl.trim(),
+        'voiceApiKey': _voiceApiKey.trim(),
+        'voiceModel': _voiceModel.trim(),
+        'voiceResponseFormat': _voiceResponseFormat,
+        'visionEnabled': _visionEnabled,
+        'visionBaseUrl': _visionBaseUrl.trim(),
+        'visionApiKey': _visionApiKey.trim(),
+        'visionModel': _visionModel.trim(),
+        'visionResponseFormat': _visionResponseFormat,
+        'profiles': _profiles,
+        'activeProfile': _activeProfile,
+      };
       if (r['ok'] == true && r['config'] is Map) {
         _cachedConfig = (r['config'] as Map).cast<String, dynamic>();
       }
@@ -350,24 +404,89 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
       padding: const EdgeInsets.all(16),
       children: [
         _messageBar(),
-        _section('接口方案（一键切换）'),
+        _section('模型来源（二选一，互斥）'),
+        SwitchListTile(
+          value: _useLocal,
+          onChanged: (v) => setState(() {
+            _useLocal = v;
+            if (v && (_model.trim().isEmpty || _model.trim() == 'deepseek-chat')) {
+              _model = _localModel;
+            }
+          }),
+          title: const Text('服务器本地模型'),
+          subtitle: const Text('ollama · qwen2.5:0.5b · 免额度 · 1~2秒（质量一般，兜底用）'),
+          contentPadding: EdgeInsets.zero,
+        ),
+        SwitchListTile(
+          value: !_useLocal,
+          onChanged: (v) => setState(() => _useLocal = !v),
+          title: const Text('外部接口'),
+          subtitle: const Text('在线 API（freeshare / deepseek 等 · 更聪明，需额度）'),
+          contentPadding: EdgeInsets.zero,
+        ),
+        if (!_useLocal) ...[
+          _section('外部接口配置（OpenAI 兼容）'),
+          _field('API 地址', _baseUrl, (v) => _baseUrl = v),
+          Row(
+            children: [
+              Expanded(
+                child: _field('模型名', _model, (v) => _model = v,
+                    hint: 'deepseek-chat / gpt-4o-mini …'),
+              ),
+              const SizedBox(width: 8),
+              Padding(
+                padding: const EdgeInsets.only(top: 6),
+                child: OutlinedButton.icon(
+                  onPressed: _fetchingModels ? null : _pickModel,
+                  icon: _fetchingModels
+                      ? const SizedBox(
+                          width: 14, height: 14,
+                          child: CircularProgressIndicator(strokeWidth: 2))
+                      : const Icon(Icons.list_rounded, size: 16),
+                  label: const Text('读取'),
+                ),
+              ),
+            ],
+          ),
+          Padding(
+            padding: const EdgeInsets.only(left: 4, bottom: 4),
+            child: Text(
+              '点「读取」从接口在线拉取全部可用模型（GET /v1/models），下拉选一个',
+              style: Theme.of(context)
+                  .textTheme
+                  .bodySmall
+                  ?.copyWith(color: Colors.grey.shade600),
+            ),
+          ),
+          _field('API Key', _apiKey, (v) => _apiKey = v, obscure: true, hint: 'sk-…'),
+        ],
+        if (_useLocal) ...[
+          const Padding(
+            padding: EdgeInsets.only(left: 4, bottom: 6),
+            child: Text(
+                '使用服务器本地 ollama（http://127.0.0.1:11434/v1 · qwen2.5:0.5b）。\n'
+                'QQBot 在服务器本机直连，回复 1~2 秒、零额度消耗；质量比外部模型弱。',
+                style: TextStyle(fontSize: 11, color: Colors.grey)),
+          ),
+        ],
+        _section('接口方案（可选，一键切换）'),
         if (_profiles.isEmpty)
           const Padding(
             padding: EdgeInsets.only(left: 4, bottom: 6),
-            child: Text('还没有保存方案。填好下方接口后点「保存为方案」，可随时一键切换。',
+            child: Text('填好接口后点「保存为方案」，可随时一键切换。',
                 style: TextStyle(fontSize: 11, color: Colors.grey)),
           )
         else
           ..._profiles.map(_profileTile),
-        Padding(
-          padding: const EdgeInsets.symmetric(vertical: 4),
-          child: OutlinedButton.icon(
-            onPressed: _saveProfileDialog,
-            icon: const Icon(Icons.bookmark_add_outlined, size: 18),
-            label: const Text('把当前接口保存为方案'),
+        if (!_useLocal)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 4),
+            child: OutlinedButton.icon(
+              onPressed: _saveProfileDialog,
+              icon: const Icon(Icons.bookmark_add_outlined, size: 18),
+              label: const Text('把当前接口保存为方案'),
+            ),
           ),
-        ),
-        const SizedBox(height: 4),
         _section('开关'),
         SwitchListTile(
           value: _enabled,
@@ -375,40 +494,6 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
           title: const Text('启用 AI 自动回复'),
           subtitle: const Text('QQ 收到消息后由 AI 按人设自动回复'),
         ),
-        _section('模型接口（OpenAI 兼容）'),
-        _field('API 地址', _baseUrl, (v) => _baseUrl = v),
-        Row(
-          children: [
-            Expanded(
-              child: _field('模型名', _model, (v) => _model = v,
-                  hint: 'deepseek-chat / gpt-4o-mini …'),
-            ),
-            const SizedBox(width: 8),
-            Padding(
-              padding: const EdgeInsets.only(top: 6),
-              child: OutlinedButton.icon(
-                onPressed: _fetchingModels ? null : _pickModel,
-                icon: _fetchingModels
-                    ? const SizedBox(
-                        width: 14, height: 14,
-                        child: CircularProgressIndicator(strokeWidth: 2))
-                    : const Icon(Icons.list_rounded, size: 16),
-                label: const Text('读取'),
-              ),
-            ),
-          ],
-        ),
-        Padding(
-          padding: const EdgeInsets.only(left: 4, bottom: 4),
-          child: Text(
-            '点「读取」从接口在线拉取全部可用模型（GET /v1/models），下拉选一个',
-            style: Theme.of(context)
-                .textTheme
-                .bodySmall
-                ?.copyWith(color: Colors.grey.shade600),
-          ),
-        ),
-        _field('API Key', _apiKey, (v) => _apiKey = v, obscure: true, hint: 'sk-…'),
         _section('参数'),
         _slider('回复随机度', _temperature, 0.0, 1.5, (v) => _temperature = v),
         _slider('最大长度', _maxTokens.toDouble(), 100, 2000, (v) => _maxTokens = v.toInt()),
@@ -991,7 +1076,6 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
           ],
         ),
       );
-
   Widget _slider(String label, double value, double min, double max, void Function(double) onchg) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
