@@ -276,4 +276,15 @@ class SnowLumaApiClient {
     ).timeout(const Duration(seconds: 8));
     return _json(resp.body);
   }
+
+  /// AI 收藏的表情包列表：GET /ai/sticker-collect
+  Future<Map<String, dynamic>> stickerCollect() async {
+    final resp = await http
+        .get(_uri('/ai/sticker-collect'))
+        .timeout(const Duration(seconds: 10));
+    return _json(resp.body);
+  }
+
+  /// 收藏表情包的图片 URL（经服务器直读 QQBot 表情库）
+  String stickerImageUrl(String file) => '$baseUrl/ai/sticker-image?file=$file';
 }
