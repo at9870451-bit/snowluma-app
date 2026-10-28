@@ -365,9 +365,31 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
         ),
         SwitchListTile(
           value: !_useLocal,
-          onChanged: (v) => setState(() => _useLocal = !v),
+          onChanged: (v) => setState(() {
+            if (!v) return;
+            // 切外部：恢复最近保存的外部方案（任意名称，排除本地方案）
+            final extList = _profiles
+                .where((p) =>
+                    !(p['baseUrl'] ?? '').toString().contains('127.0.0.1:11434'))
+                .toList();
+            Map<String, dynamic> ext = const {};
+            for (final p in extList) {
+              if (p['name'] == _activeProfile) {
+                ext = p;
+                break;
+              }
+            }
+            if (ext.isEmpty && extList.isNotEmpty) ext = extList.last;
+            _useLocal = false;
+            if (ext.isNotEmpty) {
+              _baseUrl = (ext['baseUrl'] ?? '').toString();
+              _apiKey = (ext['apiKey'] ?? '').toString();
+              final m = (ext['model'] ?? '').toString();
+              if (m.isNotEmpty) _model = m;
+            }
+          }),
           title: const Text('外部接口'),
-          subtitle: const Text('在线 API（更聪明，需额度）；本地开启时外部配置不生效'),
+          subtitle: const Text('在线 API（更聪明，需额度）· 凭据自动存入接口方案'),
           contentPadding: EdgeInsets.zero,
         ),
         const SizedBox(height: 4),
