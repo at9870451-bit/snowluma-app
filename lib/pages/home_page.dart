@@ -304,17 +304,62 @@ class _HomePageState extends State<HomePage> {
               side: BorderSide(color: Colors.grey.shade200)),
           child: ListTile(
             contentPadding: const EdgeInsets.symmetric(horizontal: 14),
-            leading: CircleAvatar(
-              backgroundColor: online ? Colors.green.shade50 : Colors.grey.shade100,
-              child: Text(
-                uin > 0 ? uin.toString().length >= 4 ? uin.toString().substring(0, 1) : '?' : '?',
-                style: TextStyle(color: online ? Colors.green : Colors.grey.shade600),
-              ),
+            leading: Stack(
+              children: [
+                ClipOval(
+                  child: SizedBox(
+                    width: 46,
+                    height: 46,
+                    child: Image.network(
+                      // 优先服务器透传的头像，缺省用腾讯官方 QQ 头像
+                      ((a['avatar'] as String?)?.isNotEmpty ?? false)
+                          ? a['avatar'] as String
+                          : 'https://q1.qlogo.cn/g?b=qq&nk=$uin&s=100',
+                      width: 46,
+                      height: 46,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => Container(
+                        color: online ? Colors.green.shade50 : Colors.grey.shade100,
+                        alignment: Alignment.center,
+                        child: Text(
+                          uin > 0 ? uin.toString()[0] : '?',
+                          style: TextStyle(
+                              color: online
+                                  ? Colors.green
+                                  : Colors.grey.shade600,
+                              fontWeight: FontWeight.w600),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                // 在线状态角标
+                Positioned(
+                  right: 0,
+                  bottom: 0,
+                  child: Container(
+                    width: 13,
+                    height: 13,
+                    decoration: BoxDecoration(
+                      color: online
+                          ? const Color(0xFF34C759)
+                          : Colors.grey.shade400,
+                      shape: BoxShape.circle,
+                      border: Border.all(color: Colors.white, width: 2),
+                    ),
+                  ),
+                ),
+              ],
             ),
             title: Text(name.isNotEmpty ? '$name（$uin）' : 'QQ $uin'),
             subtitle: Text(
-              online ? '在线' : (a['status']?.toString() ?? '离线'),
-              style: text.bodySmall?.copyWith(color: Colors.grey.shade600),
+              online
+                  ? '在线'
+                  : ((a['status'] as String?)?.isNotEmpty ?? false
+                      ? a['status'] as String
+                      : '离线'),
+              style: text.bodySmall?.copyWith(
+                  color: online ? const Color(0xFF34C759) : Colors.grey.shade600),
             ),
             trailing: IconButton(
               onPressed: () => _msgDialog(uin),
