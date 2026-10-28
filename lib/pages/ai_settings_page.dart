@@ -78,6 +78,10 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
   bool _fetchingModels = false;
   List<String> _models = const [];
 
+  // ---- 接口方案（多套模型/API 一键切换）----
+  List<Map<String, dynamic>> _profiles = const [];
+  String _activeProfile = '';
+
   @override
   void initState() {
     super.initState();
@@ -122,6 +126,11 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
     _visionApiKey = (c['visionApiKey'] as String?) ?? '';
     _visionModel = (c['visionModel'] as String?) ?? '';
     _visionResponseFormat = (c['visionResponseFormat'] as String?) ?? 'url';
+    _profiles = ((c['profiles'] as List?) ?? const [])
+        .whereType<Map>()
+        .map((m) => m.cast<String, dynamic>())
+        .toList();
+    _activeProfile = (c['activeProfile'] as String?) ?? '';
     _chatCount = chatCount;
   }
 
@@ -240,6 +249,8 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
         'visionApiKey': _visionApiKey.trim(),
         'visionModel': _visionModel.trim(),
         'visionResponseFormat': _visionResponseFormat,
+        'profiles': _profiles,
+        'activeProfile': _activeProfile,
       });
       if (r['ok'] == true && r['config'] is Map) {
         _cachedConfig = (r['config'] as Map).cast<String, dynamic>();
@@ -339,6 +350,24 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
       padding: const EdgeInsets.all(16),
       children: [
         _messageBar(),
+        _section('接口方案（一键切换）'),
+        if (_profiles.isEmpty)
+          const Padding(
+            padding: EdgeInsets.only(left: 4, bottom: 6),
+            child: Text('还没有保存方案。填好下方接口后点「保存为方案」，可随时一键切换。',
+                style: TextStyle(fontSize: 11, color: Colors.grey)),
+          )
+        else
+          ..._profiles.map(_profileTile),
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 4),
+          child: OutlinedButton.icon(
+            onPressed: _saveProfileDialog,
+            icon: const Icon(Icons.bookmark_add_outlined, size: 18),
+            label: const Text('把当前接口保存为方案'),
+          ),
+        ),
+        const SizedBox(height: 4),
         _section('开关'),
         SwitchListTile(
           value: _enabled,
@@ -387,6 +416,123 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
         const SizedBox(height: 24),
       ],
     );
+  }
+
+  Widget _profileTile(Map<String, dynamic> p) {
+    final name = (p['name'] ?? '').toString();
+    final active = name == _activeProfile;
+    final model = (p['model'] ?? '').toString();
+    final host = Uri.tryParse((p['baseUrl'] ?? '').toString())?.host ?? '';
+    return Card(
+      margin: const EdgeInsets.only(bottom: 6),
+      elevation: 0,
+      color: active ? const Color(0x14007AFF) : Theme.of(context).cardColor,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(
+            color: active ? const Color(0xFF007AFF) : Colors.grey.shade300),
+      ),
+      child: ListTile(
+        dense: true,
+        leading: Icon(
+          active ? Icons.radio_button_checked : Icons.radio_button_off,
+          color: active ? const Color(0xFF007AFF) : Colors.grey,
+          size: 20,
+        ),
+        title: Text(name,
+            style: TextStyle(
+                fontWeight: FontWeight.w600,
+                color: active ? const Color(0xFF007AFF) : null)),
+        subtitle: Text('$model · $host',
+            maxLines: 1, overflow: TextOverflow.ellipsis,
+            style: const TextStyle(fontSize: 11)),
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (!active)
+              TextButton(
+                onPressed: () => _switchProfile(name),
+                child: const Text('切换'),
+              ),
+            IconButton(
+              icon: const Icon(Icons.delete_outline, size: 18),
+              onPressed: () => _deleteProfile(name),
+            ),
+          ],
+        ),
+        onTap: () => _switchProfile(name),
+      ),
+    );
+  }
+
+  /// 保存当前接口为方案
+  Future<void> _saveProfileDialog() async {
+    final c = TextEditingController();
+    final name = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('方案名称'),
+        content: TextField(
+          controller: c,
+          autofocus: true,
+          decoration: const InputDecoration(
+              hintText: '如：本地模型 / freeshare / deepseek官'),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('取消')),
+          FilledButton(
+              onPressed: () => Navigator.pop(ctx, c.text.trim()),
+              child: const Text('保存')),
+        ],
+      ),
+    );
+    if (name == null || name.isEmpty) return;
+    final list = List<Map<String, dynamic>>.from(_profiles);
+    list.removeWhere((p) => p['name'] == name);
+    list.add({
+      'name': name,
+      'baseUrl': _baseUrl.trim(),
+      'apiKey': _apiKey.trim(),
+      'model': _model.trim(),
+    });
+    setState(() {
+      _profiles = list;
+      _activeProfile = name;
+    });
+    await _save();
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('方案「$name」已保存并启用')));
+    }
+  }
+
+  /// 一键切换方案：应用凭据并立即保存生效（自动同步 QQBot）
+  Future<void> _switchProfile(String name) async {
+    final p = _profiles.firstWhere(
+      (x) => x['name'] == name,
+      orElse: () => <String, dynamic>{},
+    );
+    if (p.isEmpty) return;
+    setState(() {
+      _baseUrl = (p['baseUrl'] ?? '').toString();
+      _apiKey = (p['apiKey'] ?? '').toString();
+      _model = (p['model'] ?? '').toString();
+      _activeProfile = name;
+    });
+    await _save();
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('已切换到「$name」：$_model @ ${Uri.tryParse(_baseUrl)?.host ?? _baseUrl}')));
+    }
+  }
+
+  void _deleteProfile(String name) {
+    setState(() {
+      _profiles = List<Map<String, dynamic>>.from(_profiles)
+        ..removeWhere((x) => x['name'] == name);
+      if (_activeProfile == name) _activeProfile = '';
+    });
+    _save();
   }
 
   // ---------- 在线拉取模型列表并选择 ----------
