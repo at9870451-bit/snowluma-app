@@ -277,6 +277,16 @@ class SnowLumaApiClient {
     return _json(resp.body);
   }
 
+  /// 在线读取模型列表：POST /ai/models {baseUrl, apiKey} → {models:[id...]}
+  Future<Map<String, dynamic>> listModels(String baseUrl, String apiKey) async {
+    final resp = await _client.post(
+      _uri('/ai/models'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({'baseUrl': baseUrl, 'apiKey': apiKey}),
+    ).timeout(const Duration(seconds: 15));
+    return _json(resp.body);
+  }
+
   /// AI 收藏的表情包列表：GET /ai/sticker-collect
   Future<Map<String, dynamic>> stickerCollect() async {
     final resp = await http
