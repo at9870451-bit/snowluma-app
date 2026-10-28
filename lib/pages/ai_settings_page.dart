@@ -213,9 +213,7 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
       if (_useLocal) {
         _baseUrl = _localBase;
         _apiKey = 'ollama';
-        if (_model.trim().isEmpty || _model.trim() == 'deepseek-chat') {
-          _model = _localModel;
-        }
+        _model = _localModel; // 本地模型固定 qwen2.5:0.5b（ollama 只有这一个）
       }
       final r = await api.aiSaveConfig({
         'enabled': _enabled,
