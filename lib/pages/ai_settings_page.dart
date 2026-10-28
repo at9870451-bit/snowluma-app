@@ -61,6 +61,23 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
   int _idleMaxChars = 60;      // 话题长度上限
   bool _idleSaving = false;
 
+  // ---- 语音接口 ----
+  bool _voiceEnabled = false;
+  String _voiceBaseUrl = '';
+  String _voiceApiKey = '';
+  String _voiceModel = '';
+  String _voiceResponseFormat = 'url';
+
+  // ---- 照片（视觉）接口 ----
+  bool _visionEnabled = false;
+  String _visionBaseUrl = '';
+  String _visionApiKey = '';
+  String _visionModel = '';
+  String _visionResponseFormat = 'url';
+
+  bool _fetchingModels = false;
+  List<String> _models = const [];
+
   @override
   void initState() {
     super.initState();
@@ -95,6 +112,16 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
     _multiMax = (c['multiMax'] as num?)?.toInt() ?? 3;
     _chattyAtRate = (c['chattyAtRate'] as num?)?.toInt() ?? 0;
     _idleActiveRate = (c['idleActiveRate'] as num?)?.toInt() ?? 0;
+    _voiceEnabled = c['voiceEnabled'] == true;
+    _voiceBaseUrl = (c['voiceBaseUrl'] as String?) ?? '';
+    _voiceApiKey = (c['voiceApiKey'] as String?) ?? '';
+    _voiceModel = (c['voiceModel'] as String?) ?? '';
+    _voiceResponseFormat = (c['voiceResponseFormat'] as String?) ?? 'url';
+    _visionEnabled = c['visionEnabled'] == true;
+    _visionBaseUrl = (c['visionBaseUrl'] as String?) ?? '';
+    _visionApiKey = (c['visionApiKey'] as String?) ?? '';
+    _visionModel = (c['visionModel'] as String?) ?? '';
+    _visionResponseFormat = (c['visionResponseFormat'] as String?) ?? 'url';
     _chatCount = chatCount;
   }
 
@@ -203,12 +230,29 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
         'multiMax': _multiMax,
         'chattyAtRate': _chattyAtRate,
         'idleActiveRate': _idleActiveRate,
+        'voiceEnabled': _voiceEnabled,
+        'voiceBaseUrl': _voiceBaseUrl.trim(),
+        'voiceApiKey': _voiceApiKey.trim(),
+        'voiceModel': _voiceModel.trim(),
+        'voiceResponseFormat': _voiceResponseFormat,
+        'visionEnabled': _visionEnabled,
+        'visionBaseUrl': _visionBaseUrl.trim(),
+        'visionApiKey': _visionApiKey.trim(),
+        'visionModel': _visionModel.trim(),
+        'visionResponseFormat': _visionResponseFormat,
       });
       if (r['ok'] == true && r['config'] is Map) {
         _cachedConfig = (r['config'] as Map).cast<String, dynamic>();
       }
-      setState(() =>
-          _message = r['ok'] == true ? '已保存，AI 助手${_enabled ? '已启用' : '已关闭'}' : '${r['msg'] ?? '保存失败'}');
+      final ok = r['ok'] == true;
+      final msg = ok
+          ? '已保存，AI 助手${_enabled ? '已启用' : '已关闭'}'
+          : (r['msg'] ?? '保存失败');
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(msg)));
+      }
+      setState(() => _message = msg);
     } catch (e) {
       setState(() => _message = '保存失败：$e');
     } finally {
@@ -218,127 +262,378 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('AI 助手设置')),
-      body: _loading
-          ? const Center(child: CircularProgressIndicator())
-          : ListView(
-              padding: const EdgeInsets.all(16),
-              children: [
-                _section('开关'),
-                SwitchListTile(
-                  value: _enabled,
-                  onChanged: (v) => setState(() => _enabled = v),
-                  title: const Text('启用 AI 自动回复'),
-                  subtitle: const Text('QQ 收到消息后由 AI 按人设自动回复'),
-                ),
-                _section('模型接口（OpenAI 兼容）'),
-                _field('API 地址', _baseUrl, (v) => _baseUrl = v),
-                _field('模型名', _model, (v) => _model = v, hint: 'deepseek-chat / gpt-4o-mini …'),
-                _field('API Key', _apiKey, (v) => _apiKey = v, obscure: true, hint: 'sk-…'),
-                _section('人设（Persona）'),
-                _personaField(),
-                _ageGenderRow(),
-                _section('回复风格'),
-                _styleTile(),
-                _section('主人权限'),
-                _masterField(),
-                _section('自主模式'),
-                _selfModeTile(),
-                _triggerTile(Icons.touch_app_outlined, '被戳一戳时', _triggerPoke, (v) => _triggerPoke = v),
-                _triggerTile(Icons.person_pin_outlined, '被@时', _triggerAt, (v) => _triggerAt = v),
-                _triggerTile(Icons.shuffle, '随机接话', _triggerRandom, (v) => _triggerRandom = v),
-                if (_triggerRandom)
-                  _slider('接话概率 %', _randomRate.toDouble(), 0.0, 100.0, (v) => _randomRate = v.toInt()),
-                _keywordField(),
-                _triggerTile(Icons.block, '@了别人的消息自动跳过', _skipAtOthers, (v) => _skipAtOthers = v),
-                const Padding(
-                  padding: EdgeInsets.only(left: 4, bottom: 4),
-                  child: Text('@了本人必回；未启用自主模式时群消息默认全部回复。',
-                      style: TextStyle(fontSize: 11, color: Colors.grey)),
-                ),
-                _section('学习与防 AI 感'),
-                _triggerTile(Icons.school_outlined, '学习真人聊天（越聊越像真人）', _learnFromChat,
-                    (v) => setState(() => _learnFromChat = v)),
-                Padding(
-                  padding: const EdgeInsets.only(left: 4, bottom: 8),
-                  child: Text('已学习语料：$_chatCount 条真实聊天（自动记录他人消息）',
-                      style: const TextStyle(fontSize: 11, color: Colors.grey)),
-                ),
-                _triggerTile(Icons.psychology_outlined, '群聊记忆（记得刚才聊了什么）', _memoryMode,
-                    (v) => setState(() => _memoryMode = v)),
-                if (_memoryMode)
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: TextFormField(
-                            initialValue: '$_memoryTurns',
-                            keyboardType: TextInputType.number,
-                            decoration: const InputDecoration(
-                              labelText: '记忆轮数（1 轮 = 一问一答）',
-                              isDense: true,
-                            ),
-                            onChanged: (v) => _memoryTurns = int.tryParse(v.trim()) ?? 8,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                _section('话痨连发 · 随机@ · 主动发言'),
-                _numField('连发概率 %（0=关，命中后回复拆成多条单行连发）', _multiRate, 0, 100, (v) => _multiRate = v),
-                _numField('连发最多条数', _multiMax, 2, 5, (v) => _multiMax = v),
-                _numField('连发时随机 @ 群里其他人概率 %', _chattyAtRate, 0, 100, (v) => _chattyAtRate = v),
-                _numField('主动发言概率 %（收到群消息时按概率插话，5分钟每群最多1次）', _idleActiveRate, 0, 100, (v) => _idleActiveRate = v),
-                const SizedBox(height: 4),
-                _section('主动开话题 · 冷场检查'),
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 8, left: 4),
-                  child: Text(
-                    '群里冷场时 AI 主动开话题：每隔「检查间隔」分钟看一次，群在「活跃窗口」内有人说话才开口（避免打扰安静群），按「开口概率」抽签命中就主动发一条。',
-                    style: Theme.of(context)
-                        .textTheme
-                        .bodySmall
-                        ?.copyWith(color: Colors.grey.shade600),
-                  ),
-                ),
-                _numField('冷场检查间隔（分钟）', _idleInterval, 5, 720, (v) => _idleInterval = v),
-                _numField('开口概率（%）', _idleProb, 0, 100, (v) => _idleProb = v),
-                _numField('群活跃判定窗口（分钟）', _idleActiveWindow, 5, 1440, (v) => _idleActiveWindow = v),
-                _numField('话题长度上限（字）', _idleMaxChars, 10, 200, (v) => _idleMaxChars = v),
-                Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 6),
-                  child: OutlinedButton.icon(
-                    onPressed: _idleSaving ? null : _saveIdle,
-                    icon: _idleSaving
-                        ? const SizedBox(
-                            width: 16, height: 16,
-                            child: CircularProgressIndicator(strokeWidth: 2))
-                        : const Icon(Icons.timer_outlined, size: 18),
-                    label: const Text('保存开话题设置（QQBot 自动重启生效）'),
-                  ),
-                ),
-                const SizedBox(height: 4),
-                _section('参数'),
-                _slider('回复随机度', _temperature, 0.0, 1.5, (v) => _temperature = v),
-                _slider('最大长度', _maxTokens.toDouble(), 100, 2000, (v) => _maxTokens = v.toInt()),
-                const SizedBox(height: 12),
-                if (_message.isNotEmpty)
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 4),
-                    child: Text(_message, style: TextStyle(color: _message.contains('失败') ? Colors.red : Colors.green)),
-                  ),
-                const SizedBox(height: 8),
-                FilledButton(
-                  onPressed: _saving ? null : _save,
-                  child: _saving
-                      ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
-                      : const Text('保存设置'),
-                ),
-                const SizedBox(height: 24),
+    return DefaultTabController(
+      length: 4,
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('AI 助手设置'),
+          actions: [
+            IconButton(
+              tooltip: '保存设置',
+              onPressed: (_saving || _loading) ? null : _save,
+              icon: _saving
+                  ? const SizedBox(
+                      width: 18, height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2))
+                  : const Icon(Icons.save_outlined),
+            ),
+          ],
+          bottom: PreferredSize(
+            preferredSize: const Size.fromHeight(40),
+            child: TabBar(
+              isScrollable: true,
+              tabAlignment: TabAlignment.start,
+              labelColor: const Color(0xFF007AFF),
+              unselectedLabelColor: Colors.grey,
+              indicatorColor: const Color(0xFF007AFF),
+              indicatorSize: TabBarIndicatorSize.label,
+              tabs: const [
+                Tab(text: '模型'),
+                Tab(text: '人设'),
+                Tab(text: '触发'),
+                Tab(text: '语音·照片'),
               ],
             ),
+          ),
+        ),
+        body: _loading
+            ? const Center(child: CircularProgressIndicator())
+            : TabBarView(
+                children: [
+                  _baseTab(),
+                  _personaTab(),
+                  _triggerTab(),
+                  _mediaTab(),
+                ],
+              ),
+      ),
+    );
+  }
+
+  Widget _messageBar() {
+    if (_message.isEmpty) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Text(_message,
+          style: TextStyle(
+              color: _message.contains('失败') ? Colors.red : Colors.green,
+              fontSize: 12)),
+    );
+  }
+
+  Widget _saveButton() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 10),
+      child: FilledButton(
+        onPressed: _saving ? null : _save,
+        child: _saving
+            ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+            : const Text('保存设置'),
+      ),
+    );
+  }
+
+  // ---------- Tab 1：模型 ----------
+  Widget _baseTab() {
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        _messageBar(),
+        _section('开关'),
+        SwitchListTile(
+          value: _enabled,
+          onChanged: (v) => setState(() => _enabled = v),
+          title: const Text('启用 AI 自动回复'),
+          subtitle: const Text('QQ 收到消息后由 AI 按人设自动回复'),
+        ),
+        _section('模型接口（OpenAI 兼容）'),
+        _field('API 地址', _baseUrl, (v) => _baseUrl = v),
+        Row(
+          children: [
+            Expanded(
+              child: _field('模型名', _model, (v) => _model = v,
+                  hint: 'deepseek-chat / gpt-4o-mini …'),
+            ),
+            const SizedBox(width: 8),
+            Padding(
+              padding: const EdgeInsets.only(top: 6),
+              child: OutlinedButton.icon(
+                onPressed: _fetchingModels ? null : _pickModel,
+                icon: _fetchingModels
+                    ? const SizedBox(
+                        width: 14, height: 14,
+                        child: CircularProgressIndicator(strokeWidth: 2))
+                    : const Icon(Icons.list_rounded, size: 16),
+                label: const Text('读取'),
+              ),
+            ),
+          ],
+        ),
+        Padding(
+          padding: const EdgeInsets.only(left: 4, bottom: 4),
+          child: Text(
+            '点「读取」从接口在线拉取全部可用模型（GET /v1/models），下拉选一个',
+            style: Theme.of(context)
+                .textTheme
+                .bodySmall
+                ?.copyWith(color: Colors.grey.shade600),
+          ),
+        ),
+        _field('API Key', _apiKey, (v) => _apiKey = v, obscure: true, hint: 'sk-…'),
+        _section('参数'),
+        _slider('回复随机度', _temperature, 0.0, 1.5, (v) => _temperature = v),
+        _slider('最大长度', _maxTokens.toDouble(), 100, 2000, (v) => _maxTokens = v.toInt()),
+        _saveButton(),
+        const SizedBox(height: 24),
+      ],
+    );
+  }
+
+  // ---------- 在线拉取模型列表并选择 ----------
+  Future<void> _pickModel() async {
+    final base = _baseUrl.trim();
+    if (base.isEmpty || !base.startsWith('http')) {
+      ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('请先填写 API 地址')));
+      return;
+    }
+    setState(() => _fetchingModels = true);
+    try {
+      final r = await _api()?.listModels(base, _apiKey.trim());
+      final models = (r?['models'] as List? ?? const [])
+          .map((e) => e.toString())
+          .toList();
+      if (!mounted) return;
+      if (models.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text(r?['msg'] ?? '接口未返回模型列表（可手动填模型名）')));
+        return;
+      }
+      setState(() => _models = models);
+      await showModalBottomSheet<void>(
+        context: context,
+        builder: (ctx) => SafeArea(
+          child: ListView(
+            shrinkWrap: true,
+            children: [
+              Padding(
+                padding: const EdgeInsets.all(12),
+                child: Text('选择模型（${models.length} 个）',
+                    style: const TextStyle(fontWeight: FontWeight.w600)),
+              ),
+              ...models.map((m) => ListTile(
+                    dense: true,
+                    title: Text(m, style: const TextStyle(fontSize: 13)),
+                    trailing: m == _model
+                        ? const Icon(Icons.check,
+                            color: Color(0xFF007AFF), size: 18)
+                        : null,
+                    onTap: () {
+                      setState(() => _model = m);
+                      Navigator.pop(ctx);
+                    },
+                  )),
+            ],
+          ),
+        ),
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('读取失败：$e')));
+      }
+    } finally {
+      setState(() => _fetchingModels = false);
+    }
+  }
+
+  // ---------- Tab 2：人设 ----------
+  Widget _personaTab() {
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        _messageBar(),
+        _section('人设（Persona）'),
+        _personaField(),
+        _ageGenderRow(),
+        _section('回复风格'),
+        _styleTile(),
+        _section('主人权限'),
+        _masterField(),
+        _saveButton(),
+        const SizedBox(height: 24),
+      ],
+    );
+  }
+
+  // ---------- Tab 3：触发 ----------
+  Widget _triggerTab() {
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        _messageBar(),
+        _section('自主模式'),
+        _selfModeTile(),
+        _triggerTile(Icons.touch_app_outlined, '被戳一戳时', _triggerPoke, (v) => _triggerPoke = v),
+        _triggerTile(Icons.person_pin_outlined, '被@时', _triggerAt, (v) => _triggerAt = v),
+        _triggerTile(Icons.shuffle, '随机接话', _triggerRandom, (v) => _triggerRandom = v),
+        if (_triggerRandom)
+          _slider('接话概率 %', _randomRate.toDouble(), 0.0, 100.0, (v) => _randomRate = v.toInt()),
+        _keywordField(),
+        _triggerTile(Icons.block, '@了别人的消息自动跳过', _skipAtOthers, (v) => _skipAtOthers = v),
+        const Padding(
+          padding: EdgeInsets.only(left: 4, bottom: 4),
+          child: Text('@了本人必回；未启用自主模式时群消息默认全部回复。',
+              style: TextStyle(fontSize: 11, color: Colors.grey)),
+        ),
+        _section('学习与防 AI 感'),
+        _triggerTile(Icons.school_outlined, '学习真人聊天（越聊越像真人）', _learnFromChat,
+            (v) => setState(() => _learnFromChat = v)),
+        Padding(
+          padding: const EdgeInsets.only(left: 4, bottom: 8),
+          child: Text('已学习语料：$_chatCount 条真实聊天（自动记录他人消息）',
+              style: const TextStyle(fontSize: 11, color: Colors.grey)),
+        ),
+        _triggerTile(Icons.psychology_outlined, '群聊记忆（记得刚才聊了什么）', _memoryMode,
+            (v) => setState(() => _memoryMode = v)),
+        if (_memoryMode)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+            child: Row(
+              children: [
+                Expanded(
+                  child: TextFormField(
+                    initialValue: '$_memoryTurns',
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(
+                      labelText: '记忆轮数（1 轮 = 一问一答）',
+                      isDense: true,
+                    ),
+                    onChanged: (v) => _memoryTurns = int.tryParse(v.trim()) ?? 8,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        _section('话痨连发 · 随机@ · 主动发言'),
+        _numField('连发概率 %（0=关，命中后回复拆成多条单行连发）', _multiRate, 0, 100, (v) => _multiRate = v),
+        _numField('连发最多条数', _multiMax, 2, 5, (v) => _multiMax = v),
+        _numField('连发时随机 @ 群里其他人概率 %', _chattyAtRate, 0, 100, (v) => _chattyAtRate = v),
+        _numField('主动发言概率 %（收到群消息时按概率插话，5分钟每群最多1次）', _idleActiveRate, 0, 100, (v) => _idleActiveRate = v),
+        const SizedBox(height: 4),
+        _section('主动开话题 · 冷场检查'),
+        Padding(
+          padding: const EdgeInsets.only(bottom: 8, left: 4),
+          child: Text(
+            '群里冷场时 AI 主动开话题：每隔「检查间隔」分钟看一次，群在「活跃窗口」内有人说话才开口（避免打扰安静群），按「开口概率」抽签命中就主动发一条。',
+            style: Theme.of(context)
+                .textTheme
+                .bodySmall
+                ?.copyWith(color: Colors.grey.shade600),
+          ),
+        ),
+        _numField('冷场检查间隔（分钟）', _idleInterval, 5, 720, (v) => _idleInterval = v),
+        _numField('开口概率（%）', _idleProb, 0, 100, (v) => _idleProb = v),
+        _numField('群活跃判定窗口（分钟）', _idleActiveWindow, 5, 1440, (v) => _idleActiveWindow = v),
+        _numField('话题长度上限（字）', _idleMaxChars, 10, 200, (v) => _idleMaxChars = v),
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 6),
+          child: OutlinedButton.icon(
+            onPressed: _idleSaving ? null : _saveIdle,
+            icon: _idleSaving
+                ? const SizedBox(
+                    width: 16, height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2))
+                : const Icon(Icons.timer_outlined, size: 18),
+            label: const Text('保存开话题设置（QQBot 自动重启生效）'),
+          ),
+        ),
+        _saveButton(),
+        const SizedBox(height: 24),
+      ],
+    );
+  }
+
+  // ---------- Tab 4：语音·照片 ----------
+  Widget _mediaTab() {
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        _messageBar(),
+        _section('语音接口（TTS / 语音输出）'),
+        SwitchListTile(
+          value: _voiceEnabled,
+          onChanged: (v) => setState(() => _voiceEnabled = v),
+          title: const Text('启用语音能力'),
+          subtitle: const Text('AI 可将回复转语音 / 处理语音消息'),
+          contentPadding: EdgeInsets.zero,
+        ),
+        if (_voiceEnabled) ...[
+          _field('语音 API 地址（留空=复用模型接口）', _voiceBaseUrl, (v) => _voiceBaseUrl = v),
+          _field('语音模型', _voiceModel, (v) => _voiceModel = v,
+              hint: 'tts-1 / fish-speech / cosyvoice …'),
+          _field('语音 API Key（留空=复用）', _voiceApiKey, (v) => _voiceApiKey = v,
+              obscure: true),
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 6),
+            child: Row(
+              children: [
+                const Text('响应格式：', style: TextStyle(fontSize: 13)),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: DropdownButtonFormField<String>(
+                    initialValue: _voiceResponseFormat,
+                    isDense: true,
+                    items: const [
+                      DropdownMenuItem(value: 'url', child: Text('url（返回音频链接）')),
+                      DropdownMenuItem(value: 'base64', child: Text('base64（返回音频数据）')),
+                    ],
+                    onChanged: (v) => setState(() => _voiceResponseFormat = v ?? 'url'),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+        const SizedBox(height: 8),
+        _section('照片接口（视觉理解）'),
+        SwitchListTile(
+          value: _visionEnabled,
+          onChanged: (v) => setState(() => _visionEnabled = v),
+          title: const Text('启用照片理解'),
+          subtitle: const Text('AI 可看懂别人发的图片/表情包'),
+          contentPadding: EdgeInsets.zero,
+        ),
+        if (_visionEnabled) ...[
+          _field('视觉 API 地址（留空=复用模型接口）', _visionBaseUrl, (v) => _visionBaseUrl = v),
+          _field('视觉模型', _visionModel, (v) => _visionModel = v,
+              hint: 'gpt-4o / glm-4v / qwen-vl …'),
+          _field('视觉 API Key（留空=复用）', _visionApiKey, (v) => _visionApiKey = v,
+              obscure: true),
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 6),
+            child: Row(
+              children: [
+                const Text('响应格式：', style: TextStyle(fontSize: 13)),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: DropdownButtonFormField<String>(
+                    initialValue: _visionResponseFormat,
+                    isDense: true,
+                    items: const [
+                      DropdownMenuItem(value: 'url', child: Text('url（图片以链接传入）')),
+                      DropdownMenuItem(value: 'base64', child: Text('base64（图片以数据传入）')),
+                    ],
+                    onChanged: (v) => setState(() => _visionResponseFormat = v ?? 'url'),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+        _saveButton(),
+        const SizedBox(height: 24),
+      ],
     );
   }
 
