@@ -9,6 +9,7 @@ import 'vnc_page.dart';
 import 'ai_settings_page.dart';
 import 'contacts_page.dart';
 import 'logs_page.dart';
+import 'stickers_page.dart';
 
 /// 主页 — 服务状态 + QQ 账号列表 + 动作/日志入口
 class HomePage extends StatefulWidget {
@@ -138,6 +139,24 @@ class _HomePageState extends State<HomePage> {
                   dense: true,
                   onTap: () => Navigator.of(context).push(
                     MaterialPageRoute(builder: (_) => const ContactsPage()),
+                  ),
+                ),
+              ),
+            ),
+            // AI 收藏的表情包入口
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 0, 12, 4),
+              child: Card(
+                margin: EdgeInsets.zero,
+                child: ListTile(
+                  leading: const Icon(Icons.emoji_emotions_outlined,
+                      color: Colors.orange),
+                  title: const Text('AI 收藏的表情包'),
+                  subtitle: const Text('看到就收 · 回复时只发自己收藏的'),
+                  trailing: const Icon(Icons.chevron_right),
+                  dense: true,
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const StickersPage()),
                   ),
                 ),
               ),
