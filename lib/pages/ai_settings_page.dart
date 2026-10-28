@@ -79,13 +79,9 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
   List<String> _models = const [];
 
   // ---- 本地模型 / 外部接口 互斥开关 ----
-  bool _useLocal = false; // true=服务器本地模型(ollama) false=外部接口
+  bool _useLocal = false;
   static const _localBase = 'http://127.0.0.1:11434/v1';
   static const _localModel = 'qwen2.5:0.5b';
-
-  // ---- 接口方案（多套模型/API 一键切换）----
-  List<Map<String, dynamic>> _profiles = const [];
-  String _activeProfile = '';
 
   @override
   void initState() {
@@ -131,13 +127,8 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
     _visionApiKey = (c['visionApiKey'] as String?) ?? '';
     _visionModel = (c['visionModel'] as String?) ?? '';
     _visionResponseFormat = (c['visionResponseFormat'] as String?) ?? 'url';
-    _useLocal = (_baseUrl).contains('127.0.0.1:11434');
-    _profiles = ((c['profiles'] as List?) ?? const [])
-        .whereType<Map>()
-        .map((m) => m.cast<String, dynamic>())
-        .toList();
-    _activeProfile = (c['activeProfile'] as String?) ?? '';
     _chatCount = chatCount;
+    _useLocal = _baseUrl.contains('127.0.0.1:11434');
   }
 
   Future<void> _load() async {
@@ -219,55 +210,14 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
         setState(() => _message = '未登录，无法保存');
         return;
       }
-      final r0payload = {
-        'enabled': _enabled,
-        'apiKey': _apiKey,
-        'baseUrl': _baseUrl.trim(),
-        'model': _model.trim(),
-        'persona': _persona.trim(),
-        'replyStyle': _replyStyle,
-        'age': _age.trim(),
-        'gender': _gender,
-        'masterUin': _masterUin.trim(),
-        'temperature': _temperature,
-        'maxTokens': _maxTokens,
-        'selfMode': _selfMode,
-        'triggerPoke': _triggerPoke,
-        'triggerAt': _triggerAt,
-        'triggerRandom': _triggerRandom,
-        'randomRate': _randomRate,
-        'keywords': _keywords.trim(),
-        'skipAtOthers': _skipAtOthers,
-        'learnFromChat': _learnFromChat,
-        'memoryMode': _memoryMode,
-        'memoryTurns': _memoryTurns,
-        'multiRate': _multiRate,
-        'multiMax': _multiMax,
-        'chattyAtRate': _chattyAtRate,
-        'idleActiveRate': _idleActiveRate,
-        'voiceEnabled': _voiceEnabled,
-        'voiceBaseUrl': _voiceBaseUrl.trim(),
-        'voiceApiKey': _voiceApiKey.trim(),
-        'voiceModel': _voiceModel.trim(),
-        'voiceResponseFormat': _voiceResponseFormat,
-        'visionEnabled': _visionEnabled,
-        'visionBaseUrl': _visionBaseUrl.trim(),
-        'visionApiKey': _visionApiKey.trim(),
-        'visionModel': _visionModel.trim(),
-        'visionResponseFormat': _visionResponseFormat,
-        'profiles': _profiles,
-        'activeProfile': _activeProfile,
-      };
       if (_useLocal) {
-        // 本地模型开关：强制服务器本地 ollama 凭据
-        r0payload['baseUrl'] = _localBase;
-        r0payload['apiKey'] = 'ollama';
+        _baseUrl = _localBase;
+        _apiKey = 'ollama';
         if (_model.trim().isEmpty || _model.trim() == 'deepseek-chat') {
-          r0payload['model'] = _localModel;
+          _model = _localModel;
         }
-        r0payload['activeProfile'] = '本地模型';
       }
-      final r = await api.aiSaveConfig(r0payload);
+      final r = await api.aiSaveConfig({
         'enabled': _enabled,
         'apiKey': _apiKey,
         'baseUrl': _baseUrl.trim(),
@@ -303,9 +253,7 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
         'visionApiKey': _visionApiKey.trim(),
         'visionModel': _visionModel.trim(),
         'visionResponseFormat': _visionResponseFormat,
-        'profiles': _profiles,
-        'activeProfile': _activeProfile,
-      };
+      });
       if (r['ok'] == true && r['config'] is Map) {
         _cachedConfig = (r['config'] as Map).cast<String, dynamic>();
       }
@@ -421,72 +369,10 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
           value: !_useLocal,
           onChanged: (v) => setState(() => _useLocal = !v),
           title: const Text('外部接口'),
-          subtitle: const Text('在线 API（freeshare / deepseek 等 · 更聪明，需额度）'),
+          subtitle: const Text('在线 API（更聪明，需额度）；本地开启时外部配置不生效'),
           contentPadding: EdgeInsets.zero,
         ),
-        if (!_useLocal) ...[
-          _section('外部接口配置（OpenAI 兼容）'),
-          _field('API 地址', _baseUrl, (v) => _baseUrl = v),
-          Row(
-            children: [
-              Expanded(
-                child: _field('模型名', _model, (v) => _model = v,
-                    hint: 'deepseek-chat / gpt-4o-mini …'),
-              ),
-              const SizedBox(width: 8),
-              Padding(
-                padding: const EdgeInsets.only(top: 6),
-                child: OutlinedButton.icon(
-                  onPressed: _fetchingModels ? null : _pickModel,
-                  icon: _fetchingModels
-                      ? const SizedBox(
-                          width: 14, height: 14,
-                          child: CircularProgressIndicator(strokeWidth: 2))
-                      : const Icon(Icons.list_rounded, size: 16),
-                  label: const Text('读取'),
-                ),
-              ),
-            ],
-          ),
-          Padding(
-            padding: const EdgeInsets.only(left: 4, bottom: 4),
-            child: Text(
-              '点「读取」从接口在线拉取全部可用模型（GET /v1/models），下拉选一个',
-              style: Theme.of(context)
-                  .textTheme
-                  .bodySmall
-                  ?.copyWith(color: Colors.grey.shade600),
-            ),
-          ),
-          _field('API Key', _apiKey, (v) => _apiKey = v, obscure: true, hint: 'sk-…'),
-        ],
-        if (_useLocal) ...[
-          const Padding(
-            padding: EdgeInsets.only(left: 4, bottom: 6),
-            child: Text(
-                '使用服务器本地 ollama（http://127.0.0.1:11434/v1 · qwen2.5:0.5b）。\n'
-                'QQBot 在服务器本机直连，回复 1~2 秒、零额度消耗；质量比外部模型弱。',
-                style: TextStyle(fontSize: 11, color: Colors.grey)),
-          ),
-        ],
-        _section('接口方案（可选，一键切换）'),
-        if (_profiles.isEmpty)
-          const Padding(
-            padding: EdgeInsets.only(left: 4, bottom: 6),
-            child: Text('填好接口后点「保存为方案」，可随时一键切换。',
-                style: TextStyle(fontSize: 11, color: Colors.grey)),
-          )
-        else
-          ..._profiles.map(_profileTile),
-        if (!_useLocal)
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: 4),
-            child: OutlinedButton.icon(
-              onPressed: _saveProfileDialog,
-              icon: const Icon(Icons.bookmark_add_outlined, size: 18),
-              label: const Text('把当前接口保存为方案'),
-            ),
-          ),
+        const SizedBox(height: 4),
         _section('开关'),
         SwitchListTile(
           value: _enabled,
@@ -494,6 +380,40 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
           title: const Text('启用 AI 自动回复'),
           subtitle: const Text('QQ 收到消息后由 AI 按人设自动回复'),
         ),
+        _section('模型接口（OpenAI 兼容）'),
+        _field('API 地址', _baseUrl, (v) => _baseUrl = v),
+        Row(
+          children: [
+            Expanded(
+              child: _field('模型名', _model, (v) => _model = v,
+                  hint: 'deepseek-chat / gpt-4o-mini …'),
+            ),
+            const SizedBox(width: 8),
+            Padding(
+              padding: const EdgeInsets.only(top: 6),
+              child: OutlinedButton.icon(
+                onPressed: _fetchingModels ? null : _pickModel,
+                icon: _fetchingModels
+                    ? const SizedBox(
+                        width: 14, height: 14,
+                        child: CircularProgressIndicator(strokeWidth: 2))
+                    : const Icon(Icons.list_rounded, size: 16),
+                label: const Text('读取'),
+              ),
+            ),
+          ],
+        ),
+        Padding(
+          padding: const EdgeInsets.only(left: 4, bottom: 4),
+          child: Text(
+            '点「读取」从接口在线拉取全部可用模型（GET /v1/models），下拉选一个',
+            style: Theme.of(context)
+                .textTheme
+                .bodySmall
+                ?.copyWith(color: Colors.grey.shade600),
+          ),
+        ),
+        _field('API Key', _apiKey, (v) => _apiKey = v, obscure: true, hint: 'sk-…'),
         _section('参数'),
         _slider('回复随机度', _temperature, 0.0, 1.5, (v) => _temperature = v),
         _slider('最大长度', _maxTokens.toDouble(), 100, 2000, (v) => _maxTokens = v.toInt()),
@@ -501,123 +421,6 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
         const SizedBox(height: 24),
       ],
     );
-  }
-
-  Widget _profileTile(Map<String, dynamic> p) {
-    final name = (p['name'] ?? '').toString();
-    final active = name == _activeProfile;
-    final model = (p['model'] ?? '').toString();
-    final host = Uri.tryParse((p['baseUrl'] ?? '').toString())?.host ?? '';
-    return Card(
-      margin: const EdgeInsets.only(bottom: 6),
-      elevation: 0,
-      color: active ? const Color(0x14007AFF) : Theme.of(context).cardColor,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: BorderSide(
-            color: active ? const Color(0xFF007AFF) : Colors.grey.shade300),
-      ),
-      child: ListTile(
-        dense: true,
-        leading: Icon(
-          active ? Icons.radio_button_checked : Icons.radio_button_off,
-          color: active ? const Color(0xFF007AFF) : Colors.grey,
-          size: 20,
-        ),
-        title: Text(name,
-            style: TextStyle(
-                fontWeight: FontWeight.w600,
-                color: active ? const Color(0xFF007AFF) : null)),
-        subtitle: Text('$model · $host',
-            maxLines: 1, overflow: TextOverflow.ellipsis,
-            style: const TextStyle(fontSize: 11)),
-        trailing: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (!active)
-              TextButton(
-                onPressed: () => _switchProfile(name),
-                child: const Text('切换'),
-              ),
-            IconButton(
-              icon: const Icon(Icons.delete_outline, size: 18),
-              onPressed: () => _deleteProfile(name),
-            ),
-          ],
-        ),
-        onTap: () => _switchProfile(name),
-      ),
-    );
-  }
-
-  /// 保存当前接口为方案
-  Future<void> _saveProfileDialog() async {
-    final c = TextEditingController();
-    final name = await showDialog<String>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('方案名称'),
-        content: TextField(
-          controller: c,
-          autofocus: true,
-          decoration: const InputDecoration(
-              hintText: '如：本地模型 / freeshare / deepseek官'),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('取消')),
-          FilledButton(
-              onPressed: () => Navigator.pop(ctx, c.text.trim()),
-              child: const Text('保存')),
-        ],
-      ),
-    );
-    if (name == null || name.isEmpty) return;
-    final list = List<Map<String, dynamic>>.from(_profiles);
-    list.removeWhere((p) => p['name'] == name);
-    list.add({
-      'name': name,
-      'baseUrl': _baseUrl.trim(),
-      'apiKey': _apiKey.trim(),
-      'model': _model.trim(),
-    });
-    setState(() {
-      _profiles = list;
-      _activeProfile = name;
-    });
-    await _save();
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('方案「$name」已保存并启用')));
-    }
-  }
-
-  /// 一键切换方案：应用凭据并立即保存生效（自动同步 QQBot）
-  Future<void> _switchProfile(String name) async {
-    final p = _profiles.firstWhere(
-      (x) => x['name'] == name,
-      orElse: () => <String, dynamic>{},
-    );
-    if (p.isEmpty) return;
-    setState(() {
-      _baseUrl = (p['baseUrl'] ?? '').toString();
-      _apiKey = (p['apiKey'] ?? '').toString();
-      _model = (p['model'] ?? '').toString();
-      _activeProfile = name;
-    });
-    await _save();
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text('已切换到「$name」：$_model @ ${Uri.tryParse(_baseUrl)?.host ?? _baseUrl}')));
-    }
-  }
-
-  void _deleteProfile(String name) {
-    setState(() {
-      _profiles = List<Map<String, dynamic>>.from(_profiles)
-        ..removeWhere((x) => x['name'] == name);
-      if (_activeProfile == name) _activeProfile = '';
-    });
-    _save();
   }
 
   // ---------- 在线拉取模型列表并选择 ----------
@@ -801,8 +604,23 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
         ),
         if (_voiceEnabled) ...[
           _field('语音 API 地址（留空=复用模型接口）', _voiceBaseUrl, (v) => _voiceBaseUrl = v),
-          _field('语音模型', _voiceModel, (v) => _voiceModel = v,
-              hint: 'tts-1 / fish-speech / cosyvoice …'),
+          Row(
+            children: [
+              Expanded(
+                child: _field('语音模型', _voiceModel, (v) => _voiceModel = v,
+                    hint: 'tts-1 / fish-speech / cosyvoice …'),
+              ),
+              const SizedBox(width: 8),
+              Padding(
+                padding: const EdgeInsets.only(top: 6),
+                child: OutlinedButton.icon(
+                  onPressed: _fetchingModels ? null : () => _pickModelFor('voice'),
+                  icon: const Icon(Icons.list_rounded, size: 16),
+                  label: const Text('读取'),
+                ),
+              ),
+            ],
+          ),
           _field('语音 API Key（留空=复用）', _voiceApiKey, (v) => _voiceApiKey = v,
               obscure: true),
           Padding(
@@ -837,8 +655,23 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
         ),
         if (_visionEnabled) ...[
           _field('视觉 API 地址（留空=复用模型接口）', _visionBaseUrl, (v) => _visionBaseUrl = v),
-          _field('视觉模型', _visionModel, (v) => _visionModel = v,
-              hint: 'gpt-4o / glm-4v / qwen-vl …'),
+          Row(
+            children: [
+              Expanded(
+                child: _field('视觉模型', _visionModel, (v) => _visionModel = v,
+                    hint: 'gpt-4o / glm-4v / qwen-vl …'),
+              ),
+              const SizedBox(width: 8),
+              Padding(
+                padding: const EdgeInsets.only(top: 6),
+                child: OutlinedButton.icon(
+                  onPressed: _fetchingModels ? null : () => _pickModelFor('vision'),
+                  icon: const Icon(Icons.list_rounded, size: 16),
+                  label: const Text('读取'),
+                ),
+              ),
+            ],
+          ),
           _field('视觉 API Key（留空=复用）', _visionApiKey, (v) => _visionApiKey = v,
               obscure: true),
           Padding(
@@ -1076,6 +909,7 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
           ],
         ),
       );
+
   Widget _slider(String label, double value, double min, double max, void Function(double) onchg) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1084,5 +918,71 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
         Slider(value: value, min: min, max: max, onChanged: onchg),
       ],
     );
+  }
+
+  /// 按来源读取模型列表（voice/vision 地址留空时复用主接口）
+  Future<void> _pickModelFor(String kind) async {
+    final base = (kind == 'voice' ? _voiceBaseUrl : _visionBaseUrl).trim();
+    final key = (kind == 'voice' ? _voiceApiKey : _visionApiKey).trim();
+    final useBase = base.isNotEmpty ? base : _baseUrl.trim();
+    final useKey = key.isNotEmpty ? key : _apiKey.trim();
+    if (!useBase.startsWith('http')) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('请先填写 API 地址')));
+      return;
+    }
+    setState(() => _fetchingModels = true);
+    try {
+      final r = await _api()?.listModels(useBase, useKey);
+      final models =
+          (r?['models'] as List? ?? const []).map((e) => e.toString()).toList();
+      if (!mounted) return;
+      if (models.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text(r?['msg'] ?? '接口未返回模型列表（可手动填模型名）')));
+        return;
+      }
+      await showModalBottomSheet<void>(
+        context: context,
+        builder: (ctx) => SafeArea(
+          child: ListView(
+            shrinkWrap: true,
+            children: [
+              Padding(
+                padding: const EdgeInsets.all(12),
+                child: Text(
+                    '选择${kind == 'voice' ? '语音' : '视觉'}模型（${models.length} 个）',
+                    style: const TextStyle(fontWeight: FontWeight.w600)),
+              ),
+              ...models.map((m) => ListTile(
+                    dense: true,
+                    title: Text(m, style: const TextStyle(fontSize: 13)),
+                    onTap: () {
+                      setState(() {
+                        if (kind == 'voice') {
+                          _voiceModel = m;
+                          _voiceBaseUrl = useBase;
+                          if (key.isEmpty) _voiceApiKey = useKey;
+                        } else {
+                          _visionModel = m;
+                          _visionBaseUrl = useBase;
+                          if (key.isEmpty) _visionApiKey = useKey;
+                        }
+                      });
+                      Navigator.pop(ctx);
+                    },
+                  )),
+            ],
+          ),
+        ),
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('读取失败：$e')));
+      }
+    } finally {
+      if (mounted) setState(() => _fetchingModels = false);
+    }
   }
 }
