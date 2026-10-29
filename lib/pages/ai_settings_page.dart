@@ -78,6 +78,18 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
   bool _fetchingModels = false;
   List<String> _models = const [];
 
+  // ---- 角色语音（role_tts）：音色/语速/音调/概率 ----
+  bool _rtEnabled = true;
+  String _rtVoice = 'zh-CN-XiaoyiNeural';
+  double _rtSpeed = 1.0;
+  double _rtPitch = 0;
+  double _rtVolume = 0;
+  double _rtRate = 0.3;
+  String _rtMode = 'voice';
+  bool _rtHumanize = true;
+  List<Map<String, dynamic>> _rtVoices = const [];
+  bool _rtSaving = false;
+
   // ---- 接口方案 ----
   List<Map<String, dynamic>> _profiles = const [];
   String _activeProfile = '';
@@ -173,10 +185,64 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
           });
         }
       } catch (_) {}
+      // 角色语音（音色）配置
+      try {
+        final vr = await api.voiceConfig();
+        final vc = (vr['config'] as Map?)?.cast<String, dynamic>() ?? {};
+        final vs = ((vr['voices'] as List?) ?? const [])
+            .whereType<Map>()
+            .map((m) => m.cast<String, dynamic>())
+            .toList();
+        if (mounted) {
+          setState(() {
+            _rtEnabled = vc['enabled'] != false;
+            _rtVoice = (vc['voice'] as String?) ?? _rtVoice;
+            _rtSpeed = (vc['speed'] as num?)?.toDouble() ?? 1.0;
+            _rtPitch = (vc['pitch'] as num?)?.toDouble() ?? 0;
+            _rtVolume = (vc['volume'] as num?)?.toDouble() ?? 0;
+            _rtRate = (vc['reply_rate'] as num?)?.toDouble() ?? 0.3;
+            _rtMode = (vc['send_mode'] as String?) ?? 'voice';
+            _rtHumanize = vc['humanize_enabled'] != false;
+            _rtVoices = vs;
+          });
+        }
+      } catch (_) {}
     } catch (e) {
       setState(() => _message = '加载失败：$e');
     } finally {
       setState(() => _loading = false);
+    }
+  }
+
+  /// 保存角色语音（音色/语速/音调/概率）→ /ai/voice-config（QQBot 自动重启生效）
+  Future<void> _saveVoice() async {
+    setState(() {
+      _rtSaving = true;
+      _message = '';
+    });
+    try {
+      final api = _api();
+      if (api == null) {
+        setState(() => _message = '未登录，无法保存');
+        return;
+      }
+      final r = await api.saveVoiceConfig({
+        'enabled': _rtEnabled,
+        'voice': _rtVoice,
+        'speed': _rtSpeed,
+        'pitch': _rtPitch,
+        'volume': _rtVolume,
+        'reply_rate': _rtRate,
+        'send_mode': _rtMode,
+        'humanize_enabled': _rtHumanize,
+      });
+      setState(() => _message = r['ok'] == true
+          ? '音色已保存，QQBot 已重启生效'
+          : '${r['msg'] ?? '保存失败'}');
+    } catch (e) {
+      setState(() => _message = '保存失败：$e');
+    } finally {
+      setState(() => _rtSaving = false);
     }
   }
 
@@ -625,6 +691,85 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
       padding: const EdgeInsets.all(16),
       children: [
         _messageBar(),
+        _section('角色语音 · 音色（人设自动匹配，可手动覆盖）'),
+        SwitchListTile(
+          value: _rtEnabled,
+          onChanged: (v) => setState(() => _rtEnabled = v),
+          title: const Text('启用角色语音'),
+          subtitle: const Text('按角色卡音色 + 情绪语气合成（edge-tts，免费）'),
+          contentPadding: EdgeInsets.zero,
+        ),
+        if (_rtEnabled) ...[
+          if (_rtVoices.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              child: DropdownButtonFormField<String>(
+                initialValue: _rtVoices.any((v) => v['id'] == _rtVoice)
+                    ? _rtVoice
+                    : _rtVoices.first['id'] as String,
+                isExpanded: true,
+                decoration: const InputDecoration(
+                    labelText: '音色', isDense: true),
+                items: _rtVoices
+                    .map((v) => DropdownMenuItem(
+                          value: v['id'] as String,
+                          child: Text('${v['name']}',
+                              style: const TextStyle(fontSize: 13)),
+                        ))
+                    .toList(),
+                onChanged: (v) => setState(() => _rtVoice = v ?? _rtVoice),
+              ),
+            ),
+          _slider('语速（1.0=正常）', _rtSpeed, 0.7, 1.4,
+              (v) => setState(() => _rtSpeed = v)),
+          _slider('音调（半音，正=高）', _rtPitch, -4, 4,
+              (v) => setState(() => _rtPitch = v)),
+          _slider('音量（dB）', _rtVolume, -6, 6,
+              (v) => setState(() => _rtVolume = v)),
+          _slider('语音概率 %', _rtRate * 100, 0, 100,
+              (v) => setState(() => _rtRate = v / 100)),
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 4),
+            child: Row(
+              children: [
+                const Text('发送模式：', style: TextStyle(fontSize: 13)),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: DropdownButtonFormField<String>(
+                    initialValue: _rtMode,
+                    isDense: true,
+                    items: const [
+                      DropdownMenuItem(value: 'voice', child: Text('只发语音')),
+                      DropdownMenuItem(value: 'both', child: Text('文字 + 语音')),
+                      DropdownMenuItem(value: 'text', child: Text('只发文字')),
+                    ],
+                    onChanged: (v) => setState(() => _rtMode = v ?? 'voice'),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          SwitchListTile(
+            value: _rtHumanize,
+            onChanged: (v) => setState(() => _rtHumanize = v),
+            title: const Text('文本润色（更像活人）'),
+            subtitle: const Text('自动加语气词、停顿、句尾助词'),
+            contentPadding: EdgeInsets.zero,
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 6),
+            child: OutlinedButton.icon(
+              onPressed: _rtSaving ? null : _saveVoice,
+              icon: _rtSaving
+                  ? const SizedBox(
+                      width: 16, height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2))
+                  : const Icon(Icons.record_voice_over_outlined, size: 18),
+              label: const Text('保存音色设置（QQBot 自动重启生效）'),
+            ),
+          ),
+        ],
+        const SizedBox(height: 4),
         _section('语音接口（TTS / 语音输出）'),
         SwitchListTile(
           value: _voiceEnabled,
