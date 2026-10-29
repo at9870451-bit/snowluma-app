@@ -287,6 +287,24 @@ class SnowLumaApiClient {
     return _json(resp.body);
   }
 
+  /// 角色语音配置：GET /ai/voice-config（音色列表 + 当前参数）
+  Future<Map<String, dynamic>> voiceConfig() async {
+    final resp = await http
+        .get(_uri('/ai/voice-config'))
+        .timeout(const Duration(seconds: 8));
+    return _json(resp.body);
+  }
+
+  /// 保存角色语音配置：POST /ai/voice-config（QQBot 自动重启生效）
+  Future<Map<String, dynamic>> saveVoiceConfig(Map<String, dynamic> cfg) async {
+    final resp = await _client.post(
+      _uri('/ai/voice-config'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode(cfg),
+    ).timeout(const Duration(seconds: 8));
+    return _json(resp.body);
+  }
+
   /// AI 收藏的表情包列表：GET /ai/sticker-collect
   Future<Map<String, dynamic>> stickerCollect() async {
     final resp = await http
