@@ -221,6 +221,7 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
             if (_rtVoicepackOnly && ups.isNotEmpty) {
               _rtVoice = (ups.last['id'] ?? _rtVoice).toString();
             }
+            // TTS 模仿模式下，实际生效音色是建议音色（显示在副标题里）
           });
         }
       } catch (_) {}
@@ -315,7 +316,7 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
         existing.add({'id': voiceId, 'name': '$autoName（${pitch ?? '?'}Hz）'});
         await api.saveVoiceConfig({
           'pitch': offset ?? 0,
-          'voicepack_only': true,      // 选中上传音色 = AI 直接发真声
+          'voicepack_only': false,     // TTS 模仿上传音频的音色（不直发录音）
           'upload_voices': existing,
         });
         if (mounted) {
@@ -909,11 +910,11 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
                   final api2 = _api();
                   if (api2 == null) return;
                   if (nv.startsWith('__upload_')) {
-                    // 上传音色：AI 直接发这段真声录音
-                    await api2.saveVoiceConfig({'voicepack_only': true});
-                    if (mounted) setState(() => _rtVpOnly = true);
+                    // 上传音色：TTS 模仿该音频的音色（基频/音量对齐）
+                    await api2.saveVoiceConfig({'voicepack_only': false});
+                    if (mounted) setState(() => _rtVpOnly = false);
                   } else {
-                    // 普通音色：TTS 合成
+                    // 普通音色：TTS 按角色卡音色合成
                     await api2.saveVoiceConfig({'voicepack_only': false});
                     if (mounted) setState(() => _rtVpOnly = false);
                   }
