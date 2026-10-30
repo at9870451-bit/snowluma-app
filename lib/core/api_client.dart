@@ -287,6 +287,35 @@ class SnowLumaApiClient {
     return _json(resp.body);
   }
 
+  /// 上传语音包 MP3：POST /ai/voicepack?name=xx（multipart 文件）
+  Future<Map<String, dynamic>> uploadVoicepack(String filePath, String name) async {
+    final req = http.MultipartRequest('POST', _uri('/ai/voicepack?name=' +
+        Uri.encodeComponent(name)));
+    req.files.add(await http.MultipartFile.fromPath('file', filePath));
+    final streamed = await _client.send(req).timeout(const Duration(seconds: 60));
+    return _json(await streamed.stream.bytesToString());
+  }
+
+  /// 语音包列表：GET /ai/voicepack
+  Future<Map<String, dynamic>> listVoicepack() async {
+    final resp = await http
+        .get(_uri('/ai/voicepack'))
+        .timeout(const Duration(seconds: 8));
+    return _json(resp.body);
+  }
+
+  /// 删除语音包：DELETE /ai/voicepack?file=xx
+  Future<Map<String, dynamic>> deleteVoicepack(String file) async {
+    final req = http.Request('DELETE', _uri('/ai/voicepack?file=' +
+        Uri.encodeComponent(file)));
+    final streamed = await _client.send(req).timeout(const Duration(seconds: 8));
+    return _json(await streamed.stream.bytesToString());
+  }
+
+  /// 语音包试听 URL
+  String voicepackUrl(String file) =>
+      '$baseUrl/ai/voicepack/file?file=${Uri.encodeComponent(file)}';
+
   /// 角色语音配置：GET /ai/voice-config（音色列表 + 当前参数）
   Future<Map<String, dynamic>> voiceConfig() async {
     final resp = await http
