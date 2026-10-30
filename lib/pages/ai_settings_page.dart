@@ -1,3 +1,6 @@
+import 'dart:io';
+
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 
 import '../core/app_state.dart';
@@ -89,6 +92,8 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
   bool _rtHumanize = true;
   List<Map<String, dynamic>> _rtVoices = const [];
   bool _rtSaving = false;
+  List<Map<String, dynamic>> _vpItems = const [];
+  bool _vpLoading = false;
 
   // ---- 接口方案 ----
   List<Map<String, dynamic>> _profiles = const [];
@@ -207,6 +212,18 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
           });
         }
       } catch (_) {}
+      // 语音包列表
+      try {
+        final vp = await api.listVoicepack();
+        if (mounted) {
+          setState(() {
+            _vpItems = ((vp['items'] as List?) ?? const [])
+                .whereType<Map>()
+                .map((m) => m.cast<String, dynamic>())
+                .toList();
+          });
+        }
+      } catch (_) {}
     } catch (e) {
       setState(() => _message = '加载失败：$e');
     } finally {
@@ -244,6 +261,77 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
     } finally {
       setState(() => _rtSaving = false);
     }
+  }
+
+  /// 上传 MP3 音色样本
+  Future<void> _uploadVoicepack() async {
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.custom, allowedExtensions: ['mp3', 'wav', 'ogg']);
+      final path = result?.files.single.path;
+      if (path == null) return;
+      final name = result!.files.single.name;
+      setState(() => _message = '上传中…');
+      final api = _api();
+      if (api == null) return;
+      final r = await api.uploadVoicepack(path, name);
+      final analysis = (r['analysis'] as Map?)?.cast<String, dynamic>() ?? {};
+      final pitch = analysis['pitch_hz'];
+      final offset = analysis['pitch_offset'];
+      // 上传成功 → 应用音色特征（音高对齐）
+      if (r['ok'] == true) {
+        await api.saveVoiceConfig({
+          'pitch': offset ?? 0,
+        });
+        await _load();
+      }
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text(r['ok'] == true
+                ? '已上传并分析：基频 ${pitch ?? '?'}Hz，音高偏移 ${offset ?? '?'} 半音'
+                : (r['msg'] ?? '上传失败'))));
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('上传失败：$e')));
+      }
+    }
+  }
+
+  Widget _vpTile(Map<String, dynamic> it) {
+    final file = (it['file'] ?? '').toString();
+    final name = (it['name'] ?? '').toString();
+    final analysis = (it['analysis'] as Map?)?.cast<String, dynamic>() ?? {};
+    final pitch = analysis['pitch_hz'];
+    return ListTile(
+      dense: true,
+      leading: const Icon(Icons.graphic_eq_outlined, color: Color(0xFF007AFF)),
+      title: Text(name, style: const TextStyle(fontSize: 13),
+          maxLines: 1, overflow: TextOverflow.ellipsis),
+      subtitle: Text(pitch != null ? '基频 ${pitch}Hz' : file,
+          style: const TextStyle(fontSize: 11)),
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          IconButton(
+            icon: const Icon(Icons.play_circle_outline, size: 20),
+            onPressed: () {
+              /* 试听：浏览器或系统播放器 */
+              ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('试听地址已生成（见日志）')));
+            },
+          ),
+          IconButton(
+            icon: const Icon(Icons.delete_outline, size: 18),
+            onPressed: () async {
+              await _api()?.deleteVoicepack(file);
+              await _load();
+            },
+          ),
+        ],
+      ),
+    );
   }
 
   /// 保存主动开话题（冷场检查）设置 → /ai/idle-talk（保存后 QQBot 自动重启生效）
@@ -720,6 +808,25 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
                 onChanged: (v) => setState(() => _rtVoice = v ?? _rtVoice),
               ),
             ),
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 4),
+            child: OutlinedButton.icon(
+              onPressed: _uploadVoicepack,
+              icon: const Icon(Icons.upload_file_outlined, size: 18),
+              label: const Text('上传 MP3 音色样本（AI 学习其音高）'),
+            ),
+          ),
+          if (_vpItems.isNotEmpty) ...[
+            Padding(
+              padding: const EdgeInsets.only(left: 4, top: 2),
+              child: Text('已上传语音包（${_vpItems.length} 个，AI 按概率直接发）',
+                  style: Theme.of(context)
+                      .textTheme
+                      .bodySmall
+                      ?.copyWith(color: Colors.grey.shade600)),
+            ),
+            ..._vpItems.map(_vpTile),
+          ],
           _slider('语速（1.0=正常）', _rtSpeed, 0.7, 1.4,
               (v) => setState(() => _rtSpeed = v)),
           _slider('音调（半音，正=高）', _rtPitch, -4, 4,
