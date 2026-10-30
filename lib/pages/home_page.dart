@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../core/app_state.dart';
+import 'qqbot_panel_page.dart';
 import '../core/bridge.dart';
 import 'actions_page.dart';
 import 'login_page.dart';
@@ -157,6 +158,24 @@ class _HomePageState extends State<HomePage> {
                   dense: true,
                   onTap: () => Navigator.of(context).push(
                     MaterialPageRoute(builder: (_) => const StickersPage()),
+                  ),
+                ),
+              ),
+            ),
+            // QQBot 管理面板入口（机器人本体：插件/群管理/日志）
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 0, 12, 4),
+              child: Card(
+                margin: EdgeInsets.zero,
+                child: ListTile(
+                  leading: const Icon(Icons.smart_toy_outlined,
+                      color: Color(0xFF007AFF)),
+                  title: const Text('QQBot 管理面板'),
+                  subtitle: const Text('插件 / 群管理 / 日志 · 机器人本体'),
+                  trailing: const Icon(Icons.chevron_right),
+                  dense: true,
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const QqbotPanelPage()),
                   ),
                 ),
               ),
