@@ -96,7 +96,6 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
   bool _vpLoading = false;
   bool _rtVpOnly = false;
   bool _rtVoicepackOnly = false;
-  bool _rtVpOnly = false; // 选中「上传音色」= AI 直接发真声语音包
   final Map<int, String> _vpAutoName = {};  // 上传音色编号 → 语音包文件
 
   // ---- 接口方案 ----
