@@ -271,7 +271,7 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
       final path = result?.files.single.path;
       if (path == null) return;
       final name = result!.files.single.name;
-      setState(() => _message = '上传中…');
+      setState(() { _message = '上传中…'; _vpLoading = true; });
       final api = _api();
       if (api == null) return;
       final r = await api.uploadVoicepack(path, name);
@@ -296,6 +296,8 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
         ScaffoldMessenger.of(context)
             .showSnackBar(SnackBar(content: Text('上传失败：$e')));
       }
+    } finally {
+      if (mounted) setState(() => _vpLoading = false);
     }
   }
 
@@ -468,6 +470,7 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
                 Tab(text: '人设'),
                 Tab(text: '触发'),
                 Tab(text: '语音·照片'),
+                Tab(text: '工具'),
               ],
             ),
           ),
@@ -480,6 +483,7 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
                   _personaTab(),
                   _triggerTab(),
                   _mediaTab(),
+                  _toolsTab(),
                 ],
               ),
       ),
@@ -774,6 +778,57 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
   }
 
   // ---------- Tab 4：语音·照片 ----------
+  // ---------- Tab 5：工具（语音包上传/管理） ----------
+  Widget _toolsTab() {
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        _messageBar(),
+        _section('语音包 · MP3 音色样本'),
+        Padding(
+          padding: const EdgeInsets.only(bottom: 8, left: 4),
+          child: Text(
+            '上传一段 MP3（自己录音或任意音频），服务器自动分析其基频（音高）特征，'
+            'AI 的合成语音会向该音色靠拢；同时作为「语音包」，AI 会按概率直接发送这段录音（真声最像活人）。',
+            style: Theme.of(context)
+                .textTheme
+                .bodySmall
+                ?.copyWith(color: Colors.grey.shade600),
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 6),
+          child: FilledButton.icon(
+            onPressed: _uploadVoicepack,
+            icon: _vpLoading
+                ? const SizedBox(
+                    width: 16, height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2))
+                : const Icon(Icons.upload_file_outlined, size: 18),
+            label: const Text('选择 MP3 并上传服务器'),
+          ),
+        ),
+        if (_vpItems.isEmpty)
+          const Padding(
+            padding: EdgeInsets.only(left: 4),
+            child: Text('还没有上传语音包。', style: TextStyle(fontSize: 11, color: Colors.grey)),
+          )
+        else ...[
+          Padding(
+            padding: const EdgeInsets.only(left: 4, top: 4, bottom: 4),
+            child: Text('已上传语音包（${_vpItems.length} 个）',
+                style: Theme.of(context)
+                    .textTheme
+                    .bodySmall
+                    ?.copyWith(color: Colors.grey.shade600)),
+          ),
+          ..._vpItems.map(_vpTile),
+        ],
+        const SizedBox(height: 24),
+      ],
+    );
+  }
+
   Widget _mediaTab() {
     return ListView(
       padding: const EdgeInsets.all(16),
@@ -808,25 +863,6 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
                 onChanged: (v) => setState(() => _rtVoice = v ?? _rtVoice),
               ),
             ),
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: 4),
-            child: OutlinedButton.icon(
-              onPressed: _uploadVoicepack,
-              icon: const Icon(Icons.upload_file_outlined, size: 18),
-              label: const Text('上传 MP3 音色样本（AI 学习其音高）'),
-            ),
-          ),
-          if (_vpItems.isNotEmpty) ...[
-            Padding(
-              padding: const EdgeInsets.only(left: 4, top: 2),
-              child: Text('已上传语音包（${_vpItems.length} 个，AI 按概率直接发）',
-                  style: Theme.of(context)
-                      .textTheme
-                      .bodySmall
-                      ?.copyWith(color: Colors.grey.shade600)),
-            ),
-            ..._vpItems.map(_vpTile),
-          ],
           _slider('语速（1.0=正常）', _rtSpeed, 0.7, 1.4,
               (v) => setState(() => _rtSpeed = v)),
           _slider('音调（半音，正=高）', _rtPitch, -4, 4,
