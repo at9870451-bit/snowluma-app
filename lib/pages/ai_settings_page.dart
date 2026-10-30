@@ -277,13 +277,13 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
             const SnackBar(content: Text('文件太小（<1KB），请选有效的音频文件')));
         return;
       }
+      final name = file.name;
       final ext = name.split('.').last.toLowerCase();
       if (!['mp3', 'wav', 'ogg', 'm4a', 'aac', 'flac'].contains(ext)) {
         ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('请选择音频文件（mp3/wav/ogg/m4a/aac/flac）')));
         return;
       }
-      final name = file.name;
       setState(() { _message = '上传中…'; _vpLoading = true; });
       final api = _api();
       if (api == null) return;
