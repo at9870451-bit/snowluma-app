@@ -287,6 +287,41 @@ class SnowLumaApiClient {
     return _json(resp.body);
   }
 
+  /// AI 学习：抓网页
+  Future<Map<String, dynamic>> learnFromUrl(String url) async {
+    final resp = await _client.post(
+      _uri('/ai/learn'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({'url': url}),
+    ).timeout(const Duration(seconds: 60));
+    return _json(resp.body);
+  }
+
+  /// AI 学习：贴文本
+  Future<Map<String, dynamic>> learnFromText(String text) async {
+    final resp = await _client.post(
+      _uri('/ai/learn'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({'text': text}),
+    ).timeout(const Duration(seconds: 60));
+    return _json(resp.body);
+  }
+
+  /// AI 学习：统计
+  Future<Map<String, dynamic>> learnStats() async {
+    final resp = await http
+        .get(_uri('/ai/learn/stats'))
+        .timeout(const Duration(seconds: 10));
+    return _json(resp.body);
+  }
+
+  /// AI 学习：抽样
+  Future<Map<String, dynamic>> learnSample() async {
+    final resp = await http
+        .get(_uri('/ai/learn/sample'))
+        .timeout(const Duration(seconds: 10));
+    return _json(resp.body);
+  }
   /// 上传语音包 MP3：POST /ai/voicepack?name=xx（multipart 文件）
   Future<Map<String, dynamic>> uploadVoicepack(String filePath, String name) async {
     final req = http.MultipartRequest('POST', _uri('/ai/voicepack?name=' +
