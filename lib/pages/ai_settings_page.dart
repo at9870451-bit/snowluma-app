@@ -98,6 +98,13 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
   bool _rtVoicepackOnly = false;
   final Map<int, String> _vpAutoName = {};  // 上传音色编号 → 语音包文件
 
+  // ---- AI 学习（网页语料）----
+  final TextEditingController _learnUrl = TextEditingController();
+  final TextEditingController _learnText = TextEditingController();
+  int _learnTotal = 0;
+  List<String> _learnSamples = const [];
+  bool _learnBusy = false;
+
   // ---- 接口方案 ----
   List<Map<String, dynamic>> _profiles = const [];
   String _activeProfile = '';
@@ -234,6 +241,16 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
                 .whereType<Map>()
                 .map((m) => m.cast<String, dynamic>())
                 .toList();
+          });
+        }
+      } catch (_) {}
+
+      // AI 学习统计
+      try {
+        final ls = await api.learnStats();
+        if (mounted) {
+          setState(() {
+            _learnTotal = ((ls['stats'] as Map?)?['total'] as num?)?.toInt() ?? 0;
           });
         }
       } catch (_) {}
@@ -378,6 +395,79 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
     );
   }
 
+  /// AI 学习：抓取网页 URL
+  Future<void> _learnFromUrl() async {
+    final url = _learnUrl.text.trim();
+    if (!url.startsWith('http')) {
+      ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('请输入 http/https 开头的网址')));
+      return;
+    }
+    setState(() { _learnBusy = true; _message = '正在抓取学习…'; });
+    try {
+      final r = await _api()?.learnFromUrl(url);
+      final res = (r?['result'] as Map?)?.cast<String, dynamic>() ?? {};
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text(r?['ok'] == true
+                ? '学习完成：新增 ${res['added'] ?? 0} 条（总计 ${res['total'] ?? '?'}）'
+                : (r?['msg'] ?? '抓取失败（该网站可能有反爬，换个源试试）'))));
+      }
+      await _refreshLearn();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('学习失败：$e')));
+      }
+    } finally {
+      if (mounted) setState(() => _learnBusy = false);
+    }
+  }
+
+  /// AI 学习：粘贴文本
+  Future<void> _learnPaste() async {
+    final text = _learnText.text.trim();
+    if (text.length < 10) {
+      ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('至少粘贴 10 个字的内容')));
+      return;
+    }
+    setState(() { _learnBusy = true; _message = '学习中…'; });
+    try {
+      final r = await _api()?.learnFromText(text);
+      final res = (r?['result'] as Map?)?.cast<String, dynamic>() ?? {};
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text(r?['ok'] == true
+                ? '学习完成：新增 ${res['added'] ?? 0} 条（总计 ${res['total'] ?? '?'}）'
+                : (r?['msg'] ?? '学习失败'))));
+        _learnText.clear();
+      }
+      await _refreshLearn();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('学习失败：$e')));
+      }
+    } finally {
+      if (mounted) setState(() => _learnBusy = false);
+    }
+  }
+
+  Future<void> _refreshLearn() async {
+    try {
+      final ls = await _api()?.learnStats();
+      final sp = await _api()?.learnSample();
+      if (mounted) {
+        setState(() {
+          _learnTotal = ((ls?['stats'] as Map?)?['total'] as num?)?.toInt() ?? 0;
+          _learnSamples = ((sp?['samples'] as List?) ?? const [])
+              .map((e) => e.toString())
+              .toList();
+        });
+      }
+    } catch (_) {}
+  }
   /// 保存主动开话题（冷场检查）设置 → /ai/idle-talk（保存后 QQBot 自动重启生效）
   Future<void> _saveIdle() async {
     setState(() {
@@ -865,6 +955,72 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
                     ?.copyWith(color: Colors.grey.shade600)),
           ),
           ..._vpItems.map(_vpTile),
+        ],
+        const SizedBox(height: 12),
+        _section('AI 网上学习（让它学会聊天）'),
+        Padding(
+          padding: const EdgeInsets.only(bottom: 8, left: 4),
+          child: Text(
+            '让 AI 浏览网页/读你贴的聊天记录，学习真人说话的语气。'
+            '已学 $_learnTotal 条，回复时随机借鉴（学语气，不照抄）。',
+            style: Theme.of(context)
+                .textTheme
+                .bodySmall
+                ?.copyWith(color: Colors.grey.shade600),
+          ),
+        ),
+        TextField(
+          controller: _learnUrl,
+          decoration: const InputDecoration(
+            labelText: '网页地址（论坛/帖子链接）',
+            hintText: 'https://...',
+            isDense: true,
+            prefixIcon: Icon(Icons.link),
+          ),
+        ),
+        const SizedBox(height: 8),
+        FilledButton.icon(
+          onPressed: _learnBusy ? null : _learnFromUrl,
+          icon: _learnBusy
+              ? const SizedBox(width: 16, height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2))
+              : const Icon(Icons.travel_explore, size: 18),
+          label: const Text('浏览这个网页并学习'),
+        ),
+        const SizedBox(height: 12),
+        TextField(
+          controller: _learnText,
+          maxLines: 4,
+          decoration: const InputDecoration(
+            labelText: '或粘贴聊天记录/段子（每行一句）',
+            hintText: '一行一句，AI 学习这些说法的语气',
+            isDense: true,
+            alignLabelWithHint: true,
+          ),
+        ),
+        const SizedBox(height: 8),
+        OutlinedButton.icon(
+          onPressed: _learnBusy ? null : _learnPaste,
+          icon: const Icon(Icons.school_outlined, size: 18),
+          label: const Text('学习粘贴的内容'),
+        ),
+        if (_learnSamples.isNotEmpty) ...[
+          const SizedBox(height: 12),
+          Padding(
+            padding: const EdgeInsets.only(left: 4, bottom: 4),
+            child: Text(
+                '最近学到的说法（示例）',
+                style: Theme.of(context)
+                    .textTheme
+                    .bodySmall
+                    ?.copyWith(color: Colors.grey.shade600)),
+          ),
+          ..._learnSamples.take(4).map((t) => Padding(
+                padding: const EdgeInsets.only(left: 8, bottom: 2),
+                child: Text('· $t',
+                    style: const TextStyle(fontSize: 11, color: Colors.grey),
+                    maxLines: 1, overflow: TextOverflow.ellipsis),
+              )),
         ],
         const SizedBox(height: 24),
       ],
