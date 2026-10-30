@@ -94,6 +94,7 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
   bool _rtSaving = false;
   List<Map<String, dynamic>> _vpItems = const [];
   bool _vpLoading = false;
+  final Map<int, String> _vpAutoName = {};  // 上传音色编号 → 语音包文件
 
   // ---- 接口方案 ----
   List<Map<String, dynamic>> _profiles = const [];
@@ -267,10 +268,16 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
   Future<void> _uploadVoicepack() async {
     try {
       final result = await FilePicker.platform.pickFiles(
-        type: FileType.custom, allowedExtensions: ['mp3', 'wav', 'ogg']);
-      final path = result?.files.single.path;
-      if (path == null) return;
-      final name = result!.files.single.name;
+        type: FileType.audio);
+      final file = result?.files.single;
+      final path = file?.path;
+      if (path == null || file == null) return;
+      if (file.size < 1000) {
+        ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('文件太小（<1KB），请选有效的音频文件')));
+        return;
+      }
+      final name = file.name;
       setState(() { _message = '上传中…'; _vpLoading = true; });
       final api = _api();
       if (api == null) return;
@@ -278,11 +285,17 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
       final analysis = (r['analysis'] as Map?)?.cast<String, dynamic>() ?? {};
       final pitch = analysis['pitch_hz'];
       final offset = analysis['pitch_offset'];
-      // 上传成功 → 应用音色特征（音高对齐）
+      // 上传成功 → 自动起音色名「上传音色N」，加进音色列表并切换
       if (r['ok'] == true) {
-        await api.saveVoiceConfig({
-          'pitch': offset ?? 0,
-        });
+        final n = _vpItems.length + 1;
+        final autoName = '上传音色$n';
+        _rtVoices = [
+          ..._rtVoices,
+          {'id': '__upload_$n', 'name': '$autoName（${pitch ?? '?'}Hz）'},
+        ];
+        _rtVoice = '__upload_$n';
+        _vpAutoName[n] = _rtVoice;  // 记录 id → 实际文件映射（发送语音包用）
+        await api.saveVoiceConfig({'pitch': offset ?? 0});
         await _load();
       }
       if (mounted) {
@@ -860,7 +873,17 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
                               style: const TextStyle(fontSize: 13)),
                         ))
                     .toList(),
-                onChanged: (v) => setState(() => _rtVoice = v ?? _rtVoice),
+                onChanged: (v) async {
+                  final nv = v ?? _rtVoice;
+                  setState(() => _rtVoice = nv);
+                  if (nv.startsWith('__upload_')) {
+                    // 上传音色：启用语音包优先（AI 直接发这段录音）
+                    final api2 = _api();
+                    if (api2 != null) {
+                      await api2.saveVoiceConfig({'voicepack_rate': 0.5});
+                    }
+                  }
+                },
               ),
             ),
           _slider('语速（1.0=正常）', _rtSpeed, 0.7, 1.4,
