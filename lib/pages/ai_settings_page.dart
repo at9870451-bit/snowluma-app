@@ -268,13 +268,19 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
   Future<void> _uploadVoicepack() async {
     try {
       final result = await FilePicker.platform.pickFiles(
-        type: FileType.audio);
+        type: FileType.any);
       final file = result?.files.single;
       final path = file?.path;
       if (path == null || file == null) return;
       if (file.size < 1000) {
         ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('文件太小（<1KB），请选有效的音频文件')));
+        return;
+      }
+      final ext = name.split('.').last.toLowerCase();
+      if (!['mp3', 'wav', 'ogg', 'm4a', 'aac', 'flac'].contains(ext)) {
+        ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('请选择音频文件（mp3/wav/ogg/m4a/aac/flac）')));
         return;
       }
       final name = file.name;
