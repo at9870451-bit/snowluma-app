@@ -287,6 +287,23 @@ class SnowLumaApiClient {
     return _json(resp.body);
   }
 
+  /// AI 自动学习配置：GET /ai/learn/auto
+  Future<Map<String, dynamic>> learnAuto() async {
+    final resp = await http
+        .get(_uri('/ai/learn/auto'))
+        .timeout(const Duration(seconds: 10));
+    return _json(resp.body);
+  }
+
+  /// 保存自动学习配置：POST /ai/learn/auto
+  Future<Map<String, dynamic>> saveLearnAuto(Map<String, dynamic> cfg) async {
+    final resp = await _client.post(
+      _uri('/ai/learn/auto'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode(cfg),
+    ).timeout(const Duration(seconds: 10));
+    return _json(resp.body);
+  }
   /// AI 学习：抓网页
   Future<Map<String, dynamic>> learnFromUrl(String url) async {
     final resp = await _client.post(
