@@ -94,6 +94,7 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
   bool _rtSaving = false;
   List<Map<String, dynamic>> _vpItems = const [];
   bool _vpLoading = false;
+  bool _rtVpOnly = false; // 选中「上传音色」= AI 直接发真声语音包
   final Map<int, String> _vpAutoName = {};  // 上传音色编号 → 语音包文件
 
   // ---- 接口方案 ----
@@ -209,7 +210,16 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
             _rtRate = (vc['reply_rate'] as num?)?.toDouble() ?? 0.3;
             _rtMode = (vc['send_mode'] as String?) ?? 'voice';
             _rtHumanize = vc['humanize_enabled'] != false;
-            _rtVoices = vs;
+            _rtVoicepackOnly = vc['voicepack_only'] == true;
+            // 服务器持久化的上传音色合入下拉（重启/重进不丢）
+            final ups = ((vc['upload_voices'] as List?) ?? const [])
+                .whereType<Map>()
+                .map((m) => m.cast<String, dynamic>())
+                .toList();
+            _rtVoices = [...vs, ...ups];
+            if (_rtVoicepackOnly && ups.isNotEmpty) {
+              _rtVoice = (ups.last['id'] ?? _rtVoice).toString();
+            }
           });
         }
       } catch (_) {}
@@ -291,17 +301,28 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
       final analysis = (r['analysis'] as Map?)?.cast<String, dynamic>() ?? {};
       final pitch = analysis['pitch_hz'];
       final offset = analysis['pitch_offset'];
-      // 上传成功 → 自动起音色名「上传音色N」，加进音色列表并切换
+      // 上传成功 → 自动起音色名「上传音色N」，持久化到服务器并选中
       if (r['ok'] == true) {
         final n = _vpItems.length + 1;
         final autoName = '上传音色$n';
-        _rtVoices = [
-          ..._rtVoices,
-          {'id': '__upload_$n', 'name': '$autoName（${pitch ?? '?'}Hz）'},
-        ];
-        _rtVoice = '__upload_$n';
-        _vpAutoName[n] = _rtVoice;  // 记录 id → 实际文件映射（发送语音包用）
-        await api.saveVoiceConfig({'pitch': offset ?? 0});
+        final voiceId = '__upload_$n';
+        // 持久化：upload_voices 存服务器（重启/重进不丢）
+        final existing = _rtVoices
+            .where((v) => (v['id'] ?? '').toString().startsWith('__upload_'))
+            .map((v) => {'id': v['id'], 'name': v['name']})
+            .toList();
+        existing.add({'id': voiceId, 'name': '$autoName（${pitch ?? '?'}Hz）'});
+        await api.saveVoiceConfig({
+          'pitch': offset ?? 0,
+          'voicepack_only': true,      // 选中上传音色 = AI 直接发真声
+          'upload_voices': existing,
+        });
+        if (mounted) {
+          setState(() {
+            _rtVoice = voiceId;
+            _rtVpOnly = true;
+          });
+        }
         await _load();
       }
       if (mounted) {
@@ -868,7 +889,9 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
               child: DropdownButtonFormField<String>(
                 initialValue: _rtVoices.any((v) => v['id'] == _rtVoice)
                     ? _rtVoice
-                    : _rtVoices.first['id'] as String,
+                    : (_rtVoices.isNotEmpty
+                        ? _rtVoices.first['id'] as String
+                        : null),
                 isExpanded: true,
                 decoration: const InputDecoration(
                     labelText: '音色', isDense: true),
@@ -882,12 +905,16 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
                 onChanged: (v) async {
                   final nv = v ?? _rtVoice;
                   setState(() => _rtVoice = nv);
+                  final api2 = _api();
+                  if (api2 == null) return;
                   if (nv.startsWith('__upload_')) {
-                    // 上传音色：启用语音包优先（AI 直接发这段录音）
-                    final api2 = _api();
-                    if (api2 != null) {
-                      await api2.saveVoiceConfig({'voicepack_rate': 0.5});
-                    }
+                    // 上传音色：AI 直接发这段真声录音
+                    await api2.saveVoiceConfig({'voicepack_only': true});
+                    if (mounted) setState(() => _rtVpOnly = true);
+                  } else {
+                    // 普通音色：TTS 合成
+                    await api2.saveVoiceConfig({'voicepack_only': false});
+                    if (mounted) setState(() => _rtVpOnly = false);
                   }
                 },
               ),
