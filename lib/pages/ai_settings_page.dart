@@ -104,6 +104,9 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
   int _learnTotal = 0;
   List<String> _learnSamples = const [];
   bool _learnBusy = false;
+  bool _autoLearn = true;
+  int _autoLearnHours = 6;
+  String _autoLearnSources = "";
 
   // ---- 接口方案 ----
   List<Map<String, dynamic>> _profiles = const [];
@@ -245,6 +248,18 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
         }
       } catch (_) {}
 
+      // AI 自动学习配置
+      try {
+        final au = await api.learnAuto();
+        final auto = (au['auto'] as Map?)?.cast<String, dynamic>() ?? {};
+        if (mounted) {
+          setState(() {
+            _autoLearn = auto['enabled'] != false;
+            _autoLearnHours = (auto['interval_hours'] as num?)?.toInt() ?? 6;
+            _autoLearnSources = (auto['sources'] as String?) ?? _autoLearnSources;
+          });
+        }
+      } catch (_) {}
       // AI 学习统计
       try {
         final ls = await api.learnStats();
@@ -454,6 +469,27 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
     }
   }
 
+  /// 保存自动学习配置
+  Future<void> _saveAutoLearn() async {
+    try {
+      final r = await _api()?.saveLearnAuto({
+        'enabled': _autoLearn,
+        'interval_hours': _autoLearnHours,
+        'sources': _autoLearnSources.trim(),
+      });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text(r?['ok'] == true
+                ? '自动学习已保存（QQBot 自动重启生效）'
+                : (r?['msg'] ?? '保存失败'))));
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('保存失败：$e')));
+      }
+    }
+  }
   Future<void> _refreshLearn() async {
     try {
       final ls = await _api()?.learnStats();
@@ -969,6 +1005,51 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
                 ?.copyWith(color: Colors.grey.shade600),
           ),
         ),
+        SwitchListTile(
+          value: _autoLearn,
+          onChanged: (v) => setState(() => _autoLearn = v),
+          title: const Text('自动学习（每 6 小时自动上网学）'),
+          subtitle: const Text('开启后 AI 自己定时抓取语料，无需手动点'),
+          contentPadding: EdgeInsets.zero,
+        ),
+        if (_autoLearn) ...[
+          Row(
+            children: [
+              const Text('间隔：', style: TextStyle(fontSize: 13)),
+              const SizedBox(width: 6),
+              Expanded(
+                child: DropdownButtonFormField<int>(
+                  initialValue: _autoLearnHours,
+                  isDense: true,
+                  items: const [
+                    DropdownMenuItem(value: 2, child: Text('每 2 小时')),
+                    DropdownMenuItem(value: 6, child: Text('每 6 小时')),
+                    DropdownMenuItem(value: 12, child: Text('每 12 小时')),
+                    DropdownMenuItem(value: 24, child: Text('每天')),
+                  ],
+                  onChanged: (v) => setState(() => _autoLearnHours = v ?? 6),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          TextField(
+            controller: TextEditingController(text: _autoLearnSources),
+            maxLines: 2,
+            decoration: const InputDecoration(
+              labelText: '学习源（逗号分隔的网址）',
+              isDense: true,
+            ),
+            onChanged: (v) => _autoLearnSources = v,
+          ),
+          const SizedBox(height: 6),
+          OutlinedButton.icon(
+            onPressed: _saveAutoLearn,
+            icon: const Icon(Icons.autorenew, size: 18),
+            label: const Text('保存自动学习设置'),
+          ),
+          const SizedBox(height: 12),
+        ],
         TextField(
           controller: _learnUrl,
           decoration: const InputDecoration(
