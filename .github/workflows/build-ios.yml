@@ -116,6 +116,8 @@ jobs:
           # ATS 放行 HTTP（连接 SnowLuma 服务器 http:// 图片/桌面）
           /usr/libexec/PlistBuddy -c "Add :NSAppTransportSecurity dict" Payload/Runner.app/Info.plist 2>/dev/null || true
           /usr/libexec/PlistBuddy -c "Add :NSAppTransportSecurity:NSAllowsArbitraryLoads bool true" Payload/Runner.app/Info.plist 2>/dev/null || true
+          /usr/libexec/PlistBuddy -c "Add :UIFileSharingEnabled bool true" Payload/Runner.app/Info.plist 2>/dev/null || true
+          /usr/libexec/PlistBuddy -c "Add :LSSupportsOpeningDocumentsInPlace bool true" Payload/Runner.app/Info.plist 2>/dev/null || true
           /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString 1.0.0" Payload/Runner.app/Info.plist
           /usr/libexec/PlistBuddy -c "Set :CFBundleVersion ${GITHUB_RUN_NUMBER}" Payload/Runner.app/Info.plist
           zip -qry SnowLuma.ipa Payload
