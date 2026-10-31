@@ -22,12 +22,16 @@ class _QqbotPanelPageState extends State<QqbotPanelPage> {
   late final WebViewController _web;
   bool _loading = true;
 
-  /// 面板地址：优先用当前服务器同域名的 /qqbot/，否则退回 IP:6199
+  /// 面板地址：直连 QQBot WebUI 端口 6199
+  /// （/qqbot/ 子路径与 SnowLuma WebUI 的 /api/* 冲突，无法代理）
   String get _panelUrl {
-    final base = appState.baseUrl; // 例如 https://www.daykai.asia
-    if (base.startsWith('http')) {
-      return '${base.replaceAll(RegExp(r'/+$'), '')}/qqbot/';
-    }
+    // 从当前服务器地址提取主机名 → http://主机:6199
+    try {
+      final uri = Uri.parse(appState.baseUrl);
+      if (uri.host.isNotEmpty) {
+        return 'http://${uri.host}:6199/';
+      }
+    } catch (_) {}
     return 'http://154.12.16.204:6199/';
   }
 
