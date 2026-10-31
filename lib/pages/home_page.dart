@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../core/app_state.dart';
 import 'qqbot_panel_page.dart';
+import 'qqbot/qqbot_home_page.dart';
 import '../core/bridge.dart';
 import 'actions_page.dart';
 import 'login_page.dart';
@@ -170,12 +171,12 @@ class _HomePageState extends State<HomePage> {
                 child: ListTile(
                   leading: const Icon(Icons.smart_toy_outlined,
                       color: Color(0xFF007AFF)),
-                  title: const Text('QQBot 管理面板'),
-                  subtitle: const Text('插件 / 群管理 / 日志 · 机器人本体'),
+                  title: const Text('QQBot 管理中心'),
+                  subtitle: const Text('总览 / 知识库 / 记忆 / 插件 / 群管控'),
                   trailing: const Icon(Icons.chevron_right),
                   dense: true,
                   onTap: () => Navigator.of(context).push(
-                    MaterialPageRoute(builder: (_) => const QqbotPanelPage()),
+                    MaterialPageRoute(builder: (_) => const QqbotHomePage()),
                   ),
                 ),
               ),
