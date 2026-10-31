@@ -8,7 +8,7 @@ import 'home_page.dart';
 import 'logs_page.dart';
 import 'processes_page.dart';
 import 'vnc_page.dart';
-import 'qqbot/qqbot_home_page.dart';
+import 'botpanel/qqbot_home_page.dart';
 
 /// RootShell — iOS 原生风格毛玻璃底部导航 + 4 个 Tab
 class RootShell extends StatefulWidget {

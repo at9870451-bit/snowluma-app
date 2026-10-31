@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../core/app_state.dart';
 import 'qqbot_panel_page.dart';
-import 'qqbot/qqbot_home_page.dart';
+import 'botpanel/qqbot_home_page.dart';
 import '../core/bridge.dart';
 import 'actions_page.dart';
 import 'login_page.dart';
