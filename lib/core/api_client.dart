@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:http/http.dart' as http;
 
@@ -397,4 +398,83 @@ class SnowLumaApiClient {
   /// 收藏表情包的图片 URL（w=300 缩略图，服务器 PIL 生成，几十 KB 秒开）
   String stickerImageUrl(String file) =>
       '$baseUrl/ai/sticker-image?file=$file&w=300';
+
+  // ---- 克隆声音（/ai/clone，网关） ----
+
+  /// 克隆列表 + 服务商状态
+  Future<Map<String, dynamic>> cloneList() async {
+    final resp = await http
+        .get(_uri('/ai/clone'))
+        .timeout(const Duration(seconds: 10));
+    return _json(resp.body);
+  }
+
+  /// 从已有语音包创建克隆：POST /ai/clone?file=&name=
+  Future<Map<String, dynamic>> cloneFromVoicepack(
+      String file, String name) async {
+    final resp = await _client
+        .post(_uri('/ai/clone?file=${Uri.encodeComponent(file)}'
+            '&name=${Uri.encodeComponent(name)}'),
+            headers: {'Content-Type': 'application/json'}, body: '{}')
+        .timeout(const Duration(seconds: 60));
+    return _json(resp.body);
+  }
+
+  /// 上传新样本创建克隆：POST /ai/clone?name=（body=音频原始字节）
+  Future<Map<String, dynamic>> cloneUpload(String path, String name) async {
+    final bytes = await readBytes(path);
+    final resp = await _client
+        .post(_uri('/ai/clone?name=${Uri.encodeComponent(name)}'),
+            headers: {'Content-Type': 'application/octet-stream'},
+            body: bytes)
+        .timeout(const Duration(seconds: 90));
+    return _json(resp.body);
+  }
+
+  /// 应用克隆到机器人（自动重启生效）
+  Future<Map<String, dynamic>> cloneApply(String id) async {
+    final resp = await _client
+        .post(_uri('/ai/clone/apply'),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({'id': id}))
+        .timeout(const Duration(seconds: 60));
+    return _json(resp.body);
+  }
+
+  /// 删除克隆
+  Future<Map<String, dynamic>> cloneDelete(String id) async {
+    final req = http.Request(
+        'DELETE', _uri('/ai/clone?id=${Uri.encodeComponent(id)}'));
+    final streamed = await _client.send(req).timeout(const Duration(seconds: 15));
+    return _json(await streamed.stream.bytesToString());
+  }
+
+  /// 克隆服务商配置：GET /ai/clone-config
+  Future<Map<String, dynamic>> cloneConfig() async {
+    final resp = await http
+        .get(_uri('/ai/clone-config'))
+        .timeout(const Duration(seconds: 10));
+    return _json(resp.body);
+  }
+
+  /// 保存克隆服务商配置
+  Future<Map<String, dynamic>> cloneSaveConfig(
+      String providerType, String apiKey, String model) async {
+    final resp = await _client
+        .post(_uri('/ai/clone-config'),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({
+              'provider_type': providerType,
+              'api_key': apiKey,
+              'model': model,
+            }))
+        .timeout(const Duration(seconds: 15));
+    return _json(resp.body);
+  }
+
+  /// 读本地文件字节（克隆上传用）
+  static Future<List<int>> readBytes(String path) async {
+    final f = File(path);
+    return f.readAsBytes();
+  }
 }

@@ -94,6 +94,13 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
   bool _rtSaving = false;
   List<Map<String, dynamic>> _vpItems = const [];
   bool _vpLoading = false;
+  // 克隆声音
+  List<Map<String, dynamic>> _cloneItems = const [];
+  String _cloneProvType = 'local';
+  bool _cloneProvConfigured = false;
+  String _cloneKeyInput = '';
+  final Set<String> _cloneBusy = {};
+  bool _cloneLoading = false;
   bool _rtVpOnly = false;
   bool _rtVoicepackOnly = false;
   final Map<int, String> _vpAutoName = {};  // 上传音色编号 → 语音包文件
@@ -247,6 +254,22 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
           });
         }
       } catch (_) {}
+      // 克隆声音列表 + 服务商状态
+      try {
+        final cl = await api.cloneList();
+        final cf = await api.cloneConfig().catchError((_) => <String, dynamic>{});
+        if (mounted) {
+          setState(() {
+            _cloneItems = ((cl['items'] as List?) ?? const [])
+                .whereType<Map>()
+                .map((m) => m.cast<String, dynamic>())
+                .toList();
+            final prov = (cf['provider'] as Map?)?.cast<String, dynamic>() ?? {};
+            _cloneProvType = (prov['type'] as String?) ?? 'local';
+            _cloneProvConfigured = prov['configured'] == true;
+          });
+        }
+      } catch (_) {}
 
       // AI 自动学习配置
       try {
@@ -373,6 +396,322 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
     } finally {
       if (mounted) setState(() => _vpLoading = false);
     }
+  }
+
+  // ---------- 克隆声音 ----------
+
+  Future<void> _loadClones() async {
+    final api = _api();
+    if (api == null) return;
+    setState(() => _cloneLoading = true);
+    try {
+      final cl = await api.cloneList();
+      if (!mounted) return;
+      setState(() {
+        _cloneItems = ((cl['items'] as List?) ?? const [])
+            .whereType<Map>()
+            .map((m) => m.cast<String, dynamic>())
+            .toList();
+        _cloneLoading = false;
+      });
+    } catch (_) {
+      if (mounted) setState(() => _cloneLoading = false);
+    }
+  }
+
+  /// 从已上传语音包创建克隆
+  Future<void> _cloneFromVoicepack() async {
+    if (_vpItems.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('先在上方上传一个语音包样本')));
+      return;
+    }
+    final picked = await showModalBottomSheet<Map<String, dynamic>>(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(18))),
+      builder: (ctx) => SafeArea(
+        child: ListView(
+          shrinkWrap: true,
+          children: [
+            const Padding(
+              padding: EdgeInsets.all(14),
+              child: Text('选择要克隆的语音包',
+                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
+            ),
+            for (final vp in _vpItems.take(12))
+              ListTile(
+                dense: true,
+                title: Text('${vp['name'] ?? vp['file']}'),
+                subtitle: Text(
+                    '基频 ${((vp['analysis'] as Map?)?['pitch_hz']) ?? '?'} Hz',
+                    style: const TextStyle(fontSize: 11)),
+                onTap: () => Navigator.pop(ctx, vp),
+              ),
+          ],
+        ),
+      ),
+    );
+    if (picked == null) return;
+    final nameCtrl = TextEditingController(
+        text: '克隆·${picked['name'] ?? '音色'}');
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('克隆名称'),
+        content: TextField(controller: nameCtrl, autofocus: true),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('取消')),
+          FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('开始克隆')),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    final name = nameCtrl.text.trim();
+    if (name.isEmpty) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('名称不能为空')));
+      return;
+    }
+    final api = _api();
+    if (api == null) return;
+    setState(() => _cloneBusy.add('__new'));
+    try {
+      final r = await api.cloneFromVoicepack('${picked['file']}', name);
+      if (!mounted) return;
+      final status = (r['status'] as String?) ?? 'ready';
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(status == 'failed'
+              ? '克隆创建失败：${(r['msg'] ?? r['error'] ?? '查看日志')}'
+              : status == 'training'
+                  ? '真克隆训练中，稍后在列表看状态'
+                  : '克隆已创建（本地对齐模式）')));
+      await _loadClones();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('克隆失败：$e')));
+      }
+    } finally {
+      if (mounted) setState(() => _cloneBusy.remove('__new'));
+    }
+  }
+
+  /// 上传新音频样本直接克隆
+  Future<void> _cloneUpload() async {
+    try {
+      final result = await FilePicker.platform.pickFiles(type: FileType.any);
+      final file = result?.files.single;
+      final path = file?.path;
+      if (path == null || file == null) return;
+      if (file.size < 1000) {
+        ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('文件太小（<1KB），请选有效的音频文件')));
+        return;
+      }
+      final ext = file.name.split('.').last.toLowerCase();
+      if (!['mp3', 'wav', 'ogg', 'm4a', 'aac', 'flac'].contains(ext)) {
+        ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('请选择音频文件（mp3/wav/ogg/m4a/aac/flac）')));
+        return;
+      }
+      final nameCtrl = TextEditingController(
+          text: '克隆·${file.name.replaceAll(RegExp(r'\.[a-z0-9]+$', caseSensitive: false), '')}');
+      final ok = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('克隆名称'),
+          content: TextField(controller: nameCtrl, autofocus: true),
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('取消')),
+            FilledButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                child: const Text('开始克隆')),
+          ],
+        ),
+      );
+      if (ok != true) return;
+      final name = nameCtrl.text.trim();
+      if (name.isEmpty) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(const SnackBar(content: Text('名称不能为空')));
+        return;
+      }
+      final api = _api();
+      if (api == null) return;
+      setState(() {
+        _message = '克隆中…（样本分析+声音建模）';
+        _cloneBusy.add('__new');
+      });
+      final r = await api.cloneUpload(path, name);
+      if (!mounted) return;
+      final status = (r['status'] as String?) ?? 'ready';
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(status == 'failed'
+              ? '克隆创建失败：${(r['msg'] ?? r['error'] ?? '查看日志')}'
+              : status == 'training'
+                  ? '真克隆训练中，稍后在列表看状态'
+                  : '克隆已创建（本地对齐模式）')));
+      setState(() => _message = '');
+      await _loadClones();
+    } catch (e) {
+      if (mounted) {
+        setState(() => _message = '');
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('克隆失败：$e')));
+      }
+    } finally {
+      if (mounted) setState(() => _cloneBusy.remove('__new'));
+    }
+  }
+
+  Future<void> _cloneApply(String id) async {
+    final api = _api();
+    if (api == null) return;
+    setState(() => _cloneBusy.add(id));
+    try {
+      final r = await api.cloneApply(id);
+      if (!mounted) return;
+      final mode = (r['mode'] as String?) ?? 'pitchmatch';
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(mode == 'provider'
+              ? '已应用真克隆音色，机器人重启后生效'
+              : '已应用对齐音色（最接近音色+音高对齐），重启后生效')));
+      await api.saveVoiceConfig({'voicepack_only': false});
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('应用失败：$e')));
+      }
+    } finally {
+      if (mounted) setState(() => _cloneBusy.remove(id));
+    }
+  }
+
+  Future<void> _cloneDelete(String id) async {
+    final api = _api();
+    if (api == null) return;
+    setState(() => _cloneBusy.add(id));
+    try {
+      await api.cloneDelete(id);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('已删除')));
+      await _loadClones();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('删除失败：$e')));
+      }
+    } finally {
+      if (mounted) setState(() => _cloneBusy.remove(id));
+    }
+  }
+
+  Future<void> _saveCloneConfig() async {
+    final api = _api();
+    if (api == null) return;
+    try {
+      final r =
+          await api.cloneSaveConfig(_cloneProvType, _cloneKeyInput.trim(), '');
+      if (!mounted) return;
+      final prov = (r['provider'] as Map?)?.cast<String, dynamic>() ?? {};
+      setState(() {
+        _cloneProvType = (prov['type'] as String?) ?? _cloneProvType;
+        _cloneProvConfigured = prov['configured'] == true;
+        _cloneKeyInput = '';
+      });
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(_cloneProvConfigured
+              ? '服务商已保存，下次克隆走真克隆'
+              : '已保存（本地对齐模式）')));
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('保存失败：$e')));
+      }
+    }
+  }
+
+  Widget _cloneTile(Map<String, dynamic> c) {
+    final id = '${c['id']}';
+    final prov = (c['provider'] as Map?)?.cast<String, dynamic>() ?? {};
+    final isReal = '${prov['voice_id'] ?? ''}'.isNotEmpty;
+    final status = '${c['status'] ?? ''}';
+    final an = (c['analysis'] as Map?)?.cast<String, dynamic>() ?? {};
+    final busy = _cloneBusy.contains(id);
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey.shade200),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            isReal ? Icons.graphic_eq_rounded : Icons.tune_rounded,
+            size: 20,
+            color: isReal ? const Color(0xFF34C759) : const Color(0xFF007AFF),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('${c['name'] ?? id}',
+                    style: const TextStyle(
+                        fontSize: 13, fontWeight: FontWeight.w600)),
+                const SizedBox(height: 2),
+                Text(
+                  [
+                    isReal ? '真克隆' : '对齐',
+                    if (status == 'training') '训练中…',
+                    if (status == 'failed') '失败：${prov['msg'] ?? ''}',
+                    if (an['pitch_hz'] != null) '基频 ${an['pitch_hz']}Hz',
+                  ].join(' · '),
+                  style: TextStyle(
+                      fontSize: 11,
+                      color: status == 'failed'
+                          ? const Color(0xFFFF3B30)
+                          : Colors.grey.shade600),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ),
+          if (busy)
+            const SizedBox(
+                width: 16,
+                height: 16,
+                child: CircularProgressIndicator(strokeWidth: 2))
+          else ...[
+            TextButton(
+              onPressed: () => _cloneApply(id),
+              style: TextButton.styleFrom(
+                  visualDensity: VisualDensity.compact,
+                  foregroundColor: const Color(0xFF007AFF)),
+              child: const Text('应用', style: TextStyle(fontSize: 12.5)),
+            ),
+            IconButton(
+              visualDensity: VisualDensity.compact,
+              onPressed: () => _cloneDelete(id),
+              icon: Icon(Icons.delete_outline,
+                  size: 18, color: Colors.grey.shade400),
+            ),
+          ],
+        ],
+      ),
+    );
   }
 
   Widget _vpTile(Map<String, dynamic> it) {
@@ -992,6 +1331,127 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
           ),
           ..._vpItems.map(_vpTile),
         ],
+        const SizedBox(height: 12),
+        _section('克隆声音'),
+        Padding(
+          padding: const EdgeInsets.only(bottom: 8, left: 4),
+          child: Text(
+            '上传一段音频样本，服务器分析音色特征并生成「克隆音色」，'
+            '应用后 AI 说话会向该音色对齐（音高/音量）。'
+            '配置 fish.audio Key 后可走真·声音克隆（AI 直接用克隆出的音色说话）。',
+            style: Theme.of(context)
+                .textTheme
+                .bodySmall
+                ?.copyWith(color: Colors.grey.shade600),
+          ),
+        ),
+        Row(
+          children: [
+            Expanded(
+              child: FilledButton.icon(
+                onPressed: _cloneBusy.contains('__new') ? null : _cloneUpload,
+                icon: _cloneBusy.contains('__new')
+                    ? const SizedBox(
+                        width: 15, height: 15,
+                        child: CircularProgressIndicator(strokeWidth: 2))
+                    : const Icon(Icons.mic_rounded, size: 17),
+                label: const Text('上传样本克隆',
+                    style: TextStyle(fontSize: 12.5)),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: OutlinedButton.icon(
+                onPressed:
+                    _cloneBusy.contains('__new') ? null : _cloneFromVoicepack,
+                icon: const Icon(Icons.library_music_rounded, size: 17),
+                label: const Text('从语音包克隆',
+                    style: TextStyle(fontSize: 12.5)),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        Container(
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(
+            color: const Color(0xFFF7F7FA),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Text(
+                      '克隆服务商：${_cloneProvType == 'local' ? "本地对齐" : _cloneProvType}'
+                      '${_cloneProvConfigured ? "（已配置）" : ""}',
+                      style: const TextStyle(
+                          fontSize: 12, fontWeight: FontWeight.w600)),
+                  const Spacer(),
+                  if (_cloneProvConfigured)
+                    const Icon(Icons.check_circle,
+                        size: 14, color: Color(0xFF34C759)),
+                ],
+              ),
+              const SizedBox(height: 6),
+              Row(
+                children: [
+                  Expanded(
+                    child: DropdownButtonFormField<String>(
+                      initialValue: _cloneProvType,
+                      isDense: true,
+                      decoration: const InputDecoration(
+                          isDense: true, border: OutlineInputBorder()),
+                      items: const [
+                        DropdownMenuItem(value: 'local', child: Text('本地对齐（默认）')),
+                        DropdownMenuItem(value: 'fish', child: Text('fish.audio')),
+                      ],
+                      onChanged: (v) =>
+                          setState(() => _cloneProvType = v ?? 'local'),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: TextField(
+                      obscureText: true,
+                      decoration: InputDecoration(
+                        isDense: true,
+                        hintText: _cloneProvConfigured ? '已配置（输入可更换）' : '服务商 API Key',
+                        border: const OutlineInputBorder(),
+                      ),
+                      onChanged: (v) => _cloneKeyInput = v,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: _saveCloneConfig,
+                  icon: const Icon(Icons.key_rounded, size: 16),
+                  label: const Text('保存服务商设置',
+                      style: TextStyle(fontSize: 12.5)),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 10),
+        if (_cloneLoading)
+          const Padding(
+            padding: EdgeInsets.all(12),
+            child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+          )
+        else if (_cloneItems.isEmpty)
+          const Padding(
+            padding: EdgeInsets.only(left: 4),
+            child: Text('还没有克隆音色。上传样本或从语音包克隆。',
+                style: TextStyle(fontSize: 11, color: Colors.grey)),
+          )
+        else
+          ..._cloneItems.map(_cloneTile),
         const SizedBox(height: 12),
         _section('AI 网上学习（让它学会聊天）'),
         Padding(
