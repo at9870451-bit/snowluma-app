@@ -179,7 +179,7 @@ class _QqbotConsolePageState extends State<QqbotConsolePage> {
     }
     // 以「闭嘴」按钮为原点展开时长菜单，点外部原路收回
     final anchorCtx = anchor ?? context;
-    final pick = await showAnchorMenu<String>(
+    final pick = await showAnchorMenu(
       context,
       anchor: anchorCtx,
       items: const [
