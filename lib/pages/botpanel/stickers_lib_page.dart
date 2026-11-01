@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/app_state.dart';
 import '../../core/qqbot_client.dart';
+import '../../core/ui_anim.dart';
 import 'q_ui.dart';
 
 /// QQBot 表情包库 — 查看 AI 收藏/可用的表情包
@@ -73,21 +74,12 @@ class _QqbotStickersLibPageState extends State<QqbotStickersLibPage> {
   }
 
   Future<void> _delete(Map<String, dynamic> s) async {
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('删除这个表情包？'),
-        content: const Text('AI 将不再发这张图'),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('取消')),
-          TextButton(
-              onPressed: () => Navigator.pop(ctx, true),
-              child: const Text('删除',
-                  style: TextStyle(color: Color(0xFFFF3B30)))),
-        ],
-      ),
+    final ok = await showQConfirm(
+      context,
+      title: '删除这个表情包？',
+      content: 'AI 将不再发这张图',
+      confirmText: '删除',
+      danger: true,
     );
     if (ok != true) return;
     try {

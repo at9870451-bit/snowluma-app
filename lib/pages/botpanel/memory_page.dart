@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/app_state.dart';
 import '../../core/qqbot_client.dart';
+import '../../core/ui_anim.dart';
 import 'q_ui.dart';
 
 /// QQBot 记忆库 — 查看/新增/删除 AI 记住的内容
@@ -210,22 +211,12 @@ class _QqbotMemoryPageState extends State<QqbotMemoryPage> {
   }
 
   Future<void> _delete(Map<String, dynamic> m) async {
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('删除这条记忆？'),
-        content: Text('${m['content'] ?? ''}',
-            maxLines: 4, overflow: TextOverflow.ellipsis),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('取消')),
-          TextButton(
-              onPressed: () => Navigator.pop(ctx, true),
-              child: const Text('删除',
-                  style: TextStyle(color: Color(0xFFFF3B30)))),
-        ],
-      ),
+    final ok = await showQConfirm(
+      context,
+      title: '删除这条记忆？',
+      content: '${m['content'] ?? ''}',
+      confirmText: '删除',
+      danger: true,
     );
     if (ok != true) return;
     try {

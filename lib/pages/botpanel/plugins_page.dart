@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/app_state.dart';
 import '../../core/qqbot_client.dart';
+import '../../core/ui_anim.dart';
 import 'q_ui.dart';
 
 /// QQBot 插件管理 — 已加载/已停用插件列表，开关与重载
@@ -62,28 +63,14 @@ class _QqbotPluginsPageState extends State<QqbotPluginsPage> {
     final name = '${p['name']}';
     final isExternal = p['source'] == 'external';
     if (isExternal || !enabled) {
-      final ok = await showDialog<bool>(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          title: Text(enabled ? '启用插件？' : '停用插件？'),
-          content: Text(
-              '${p['display_name'] ?? name}\n\n'
-              '${enabled ? '启用后该插件开始工作。' : '停用后该功能立即失效，AI 将不再执行这块能力。'}'
-              '${isExternal ? '\n\n这是外部插件，改动会影响线上行为。' : ''}',
-              style: const TextStyle(fontSize: 13)),
-          actions: [
-            TextButton(
-                onPressed: () => Navigator.pop(ctx, false),
-                child: const Text('取消')),
-            TextButton(
-                onPressed: () => Navigator.pop(ctx, true),
-                child: Text(enabled ? '启用' : '停用',
-                    style: TextStyle(
-                        color: enabled
-                            ? kIosBlue
-                            : const Color(0xFFFF3B30)))),
-          ],
-        ),
+      final ok = await showQConfirm(
+        context,
+        title: enabled ? '启用插件？' : '停用插件？',
+        content: '${p['display_name'] ?? name}\n'
+            '${enabled ? '启用后该插件开始工作。' : '停用后该功能立即失效，AI 将不再执行这块能力。'}'
+            '${isExternal ? '\n（外部插件，改动会影响线上行为）' : ''}',
+        confirmText: enabled ? '启用' : '停用',
+        danger: !enabled,
       );
       if (ok != true) return;
     }
@@ -123,7 +110,7 @@ class _QqbotPluginsPageState extends State<QqbotPluginsPage> {
     }
   }
 
-  Future<void> _detail(Map<String, dynamic> p) async {
+  Future<void> _detail(Map<String, dynamic> p, {BuildContext? anchor}) async {
     showDialog(
       context: context,
       builder: (ctx) => const Center(child: CircularProgressIndicator()),
@@ -144,12 +131,10 @@ class _QqbotPluginsPageState extends State<QqbotPluginsPage> {
       qSnack(context, '读取详情失败：$err');
       return;
     }
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+    // 卡片弹出详情：从原位放大为居中面板，关闭时缩回
+    showZoomPanel(
+      context,
+      anchor: anchor ?? context,
       builder: (ctx) {
         final commands = ((detail!['commands'] as List?) ?? const [])
             .whereType<Map>()
@@ -159,13 +144,10 @@ class _QqbotPluginsPageState extends State<QqbotPluginsPage> {
         final labels =
             (detail['config_labels'] as Map?)?.cast<String, dynamic>() ?? {};
         final cfg = (detail['config'] as Map?)?.cast<String, dynamic>() ?? {};
-        return DraggableScrollableSheet(
-          expand: false,
-          initialChildSize: 0.6,
-          maxChildSize: 0.9,
-          builder: (_, ctrl) => ListView(
-            controller: ctrl,
-            padding: const EdgeInsets.fromLTRB(18, 18, 18, 30),
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(18, 18, 18, 30),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text('${detail!['display_name'] ?? detail['name']}',
                   style: const TextStyle(
@@ -313,9 +295,10 @@ class _QqbotPluginsPageState extends State<QqbotPluginsPage> {
     final name = '${p['name']}';
     final busy = _busy[name] == true;
     final external = p['source'] == 'external';
-    return GestureDetector(
-      onTap: () => _detail(p),
-      child: QCard(
+    return Builder(
+      builder: (tileCtx) => GestureDetector(
+        onTap: () => _detail(p, anchor: tileCtx),
+        child: QCard(
         padding: const EdgeInsets.fromLTRB(13, 11, 8, 11),
         child: Row(
           children: [
@@ -385,12 +368,28 @@ class _QqbotPluginsPageState extends State<QqbotPluginsPage> {
                     child: CircularProgressIndicator(strokeWidth: 2)),
               )
             else ...[
-              IconButton(
-                tooltip: '重载',
-                visualDensity: VisualDensity.compact,
-                onPressed: () => _reload(p),
-                icon: Icon(Icons.autorenew,
-                    size: 18, color: Colors.grey.shade500),
+              Builder(
+                builder: (menuCtx) => IconButton(
+                  tooltip: '更多操作',
+                  visualDensity: VisualDensity.compact,
+                  onPressed: () async {
+                    final pick = await showAnchorMenu(
+                      context,
+                      anchor: menuCtx,
+                      items: const [
+                        QMenuItem('查看详情', icon: Icons.info_outline_rounded),
+                        QMenuItem('重载插件', icon: Icons.autorenew_rounded),
+                      ],
+                    );
+                    if (pick == '查看详情') {
+                      _detail(p, anchor: menuCtx);
+                    } else if (pick == '重载插件') {
+                      _reload(p);
+                    }
+                  },
+                  icon: Icon(Icons.more_horiz_rounded,
+                      size: 20, color: Colors.grey.shade500),
+                ),
               ),
               Switch.adaptive(
                 value: enabled,
@@ -399,6 +398,7 @@ class _QqbotPluginsPageState extends State<QqbotPluginsPage> {
             ],
           ],
         ),
+      ),
       ),
     );
   }

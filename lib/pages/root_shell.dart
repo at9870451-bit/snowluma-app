@@ -8,7 +8,6 @@ import 'home_page.dart';
 import 'logs_page.dart';
 import 'processes_page.dart';
 import 'vnc_page.dart';
-import 'botpanel/qqbot_home_page.dart';
 
 /// RootShell — iOS 原生风格毛玻璃底部导航 + 4 个 Tab
 class RootShell extends StatefulWidget {
@@ -175,18 +174,11 @@ class _ToolsTab extends StatelessWidget {
               subtitle: '远程桌面 + 二维码',
               page: const VncPage(),
             ),
-            _tile(
-              context,
-              icon: Icons.smart_toy_outlined,
-              title: 'QQBot 管理',
-              subtitle: '总览 / 日志 / 知识库 / 记忆 / 插件 / 群管控',
-              page: const QqbotHomePage(),
-            ),
             const SizedBox(height: 14),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 6),
               child: Text(
-                '提示：底部导航为 iOS 毛玻璃风格，4 个 Tab 分别为 账号 / 接入 / AI / 工具。',
+                '提示：QQBot 管理中心在「账号」Tab；底部导航为 iOS 毛玻璃风格，4 个 Tab 分别为 账号 / 接入 / AI / 工具。',
                 style: text.bodySmall?.copyWith(color: Colors.grey.shade600),
               ),
             ),

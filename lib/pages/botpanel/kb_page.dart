@@ -206,28 +206,95 @@ class _QqbotKbPageState extends State<QqbotKbPage> {
     } catch (_) {}
   }
 
-  Future<void> _deleteDoc(Map<String, dynamic> doc) async {
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('删除这条知识？'),
-        content: Text(
-            '${doc['title'] != null && '${doc['title']}'.isNotEmpty ? '${doc['title']}\n' : ''}${doc['content'] ?? ''}',
-            maxLines: 4,
-            overflow: TextOverflow.ellipsis),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('取消')),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child:
-                const Text('删除', style: TextStyle(color: Color(0xFFFF3B30))),
-          ),
-        ],
+  /// 查看文档：从卡片原位放大为居中面板，关闭时缩回
+  Future<void> _viewDoc(Map<String, dynamic> doc,
+      {BuildContext? anchor}) async {
+    final tags = '${doc['tags'] ?? ''}'.trim();
+    await showZoomPanel(
+      context,
+      anchor: anchor ?? context,
+      builder: (ctx) => Padding(
+        padding: const EdgeInsets.fromLTRB(18, 18, 18, 24),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if ('${doc['title'] ?? ''}'.trim().isNotEmpty)
+              Text('${doc['title']}',
+                  style: const TextStyle(
+                      fontSize: 17, fontWeight: FontWeight.w700)),
+            const SizedBox(height: 6),
+            Row(children: [
+              if (tags.isNotEmpty) ...[
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: kIosBlue.withValues(alpha: 0.10),
+                    borderRadius: BorderRadius.circular(5),
+                  ),
+                  child: Text(tags,
+                      style: const TextStyle(fontSize: 10, color: kIosBlue)),
+                ),
+                const SizedBox(width: 8),
+              ],
+              Text('更新于 ${fmtTime((doc['updated_at'] as num?) ?? 0)}',
+                  style:
+                      TextStyle(fontSize: 11, color: Colors.grey.shade500)),
+            ]),
+            const SizedBox(height: 12),
+            Text('${doc['content'] ?? ''}',
+                style: const TextStyle(fontSize: 13.5, height: 1.55)),
+            const SizedBox(height: 18),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: () async {
+                  final ok = await showQConfirm(
+                    context,
+                    title: '删除这条知识？',
+                    content: '${doc['title'] ?? ''}${doc['content'] ?? ''}'
+                        .substring(
+                            0,
+                            ('${doc['title'] ?? ''}${doc['content'] ?? ''}'
+                                        .length >
+                                    60)
+                                ? 60
+                                : ('${doc['title'] ?? ''}${doc['content'] ?? ''}'
+                                    .length)),
+                    confirmText: '删除',
+                    danger: true,
+                  );
+                  if (ok && mounted) {
+                    Navigator.of(ctx, rootNavigator: true).maybePop();
+                    await _deleteDoc(doc, skipConfirm: true);
+                  }
+                },
+                icon: const Icon(Icons.delete_outline, size: 17),
+                label: const Text('删除这条知识'),
+                style: OutlinedButton.styleFrom(
+                    foregroundColor: const Color(0xFFFF3B30)),
+              ),
+            ),
+          ],
+        ),
       ),
     );
-    if (confirm != true) return;
+  }
+
+  Future<void> _deleteDoc(Map<String, dynamic> doc,
+      {bool skipConfirm = false}) async {
+    if (!skipConfirm) {
+      final preview =
+          '${doc['title'] != null && '${doc['title']}'.isNotEmpty ? '${doc['title']}\n' : ''}${doc['content'] ?? ''}';
+      final confirm = await showQConfirm(
+        context,
+        title: '删除这条知识？',
+        content: preview.length > 60 ? '${preview.substring(0, 60)}…' : preview,
+        confirmText: '删除',
+        danger: true,
+      );
+      if (confirm != true) return;
+    }
     try {
       final r = await _api.kbDeleteDoc((doc['id'] as num).toInt());
       if (!mounted) return;
@@ -397,10 +464,11 @@ class _QqbotKbPageState extends State<QqbotKbPage> {
   Widget _docTile(Map<String, dynamic> d) {
     final title = '${d['title'] ?? ''}'.trim();
     final tags = '${d['tags'] ?? ''}'.trim();
-    return GestureDetector(
-      onTap: () => _editDoc(doc: d),
-      onLongPress: () => _deleteDoc(d),
-      child: QCard(
+    return Builder(
+      builder: (tileCtx) => GestureDetector(
+        onTap: () => _viewDoc(d, anchor: tileCtx),
+        onLongPress: () => _deleteDoc(d),
+        child: QCard(
         padding: const EdgeInsets.all(13),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -446,6 +514,7 @@ class _QqbotKbPageState extends State<QqbotKbPage> {
             ),
           ],
         ),
+      ),
       ),
     );
   }

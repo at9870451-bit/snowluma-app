@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/app_state.dart';
 import '../../core/qqbot_client.dart';
+import '../../core/ui_anim.dart';
 import 'q_ui.dart';
 
 /// QQBot 置控台 — 群级管控（让 AI 在某个群闭嘴 / 恢复说话 / 群启用）
@@ -169,64 +170,40 @@ class _QqbotConsolePageState extends State<QqbotConsolePage> {
     }
   }
 
-  Future<void> _silenceFlow(Map<String, dynamic> g) async {
+  Future<void> _silenceFlow(Map<String, dynamic> g,
+      {BuildContext? anchor}) async {
     final cur = g['silenced'] == true;
     if (cur) {
       await _apply(g, silenced: false, duration: 0, permanent: false);
       return;
     }
-    final choice = await showModalBottomSheet<String>(
-      context: context,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-      builder: (ctx) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 6),
-              child: Row(
-                children: [
-                  const Text('让 AI 闭嘴',
-                      style:
-                          TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
-                  const Spacer(),
-                  Flexible(
-                    child: Text('${g['group_name'] ?? g['group_id']}',
-                        style: TextStyle(
-                            fontSize: 12, color: Colors.grey.shade600),
-                        overflow: TextOverflow.ellipsis),
-                  ),
-                ],
-              ),
-            ),
-            for (final e in const [
-              ['10', '10 分钟'],
-              ['60', '1 小时'],
-              ['360', '6 小时'],
-              ['1440', '1 天'],
-              ['permanent', '永久闭嘴（直到手动恢复）'],
-            ])
-              ListTile(
-                dense: true,
-                title: Text(e[1]),
-                trailing:
-                    e[0] == 'permanent' ? const Icon(Icons.block, size: 18) : null,
-                onTap: () => Navigator.pop(ctx, e[0]),
-              ),
-            const SizedBox(height: 8),
-          ],
-        ),
-      ),
+    // 以「闭嘴」按钮为原点展开时长菜单，点外部原路收回
+    final anchorCtx = anchor ?? context;
+    final pick = await showAnchorMenu<String>(
+      context,
+      anchor: anchorCtx,
+      items: const [
+        QMenuItem('10 分钟', icon: Icons.schedule_rounded),
+        QMenuItem('1 小时', icon: Icons.schedule_rounded),
+        QMenuItem('6 小时', icon: Icons.schedule_rounded),
+        QMenuItem('1 天', icon: Icons.event_repeat_rounded),
+        QMenuItem('永久闭嘴（手动恢复）', icon: Icons.block_rounded),
+      ],
     );
-    if (choice == null) return;
-    if (choice == 'permanent') {
+    if (pick == null) return;
+    if (pick.startsWith('永久')) {
       await _apply(g, silenced: true, permanent: true, duration: 0);
-    } else {
-      await _apply(g, silenced: true,
-          duration: (int.parse(choice)) * 60, permanent: false);
+      return;
     }
+    const minutesMap = {
+      '10 分钟': 10,
+      '1 小时': 60,
+      '6 小时': 360,
+      '1 天': 1440,
+    };
+    final minutes = minutesMap[pick] ?? 60;
+    await _apply(g,
+        silenced: true, duration: minutes * 60, permanent: false);
   }
 
   @override
@@ -272,14 +249,26 @@ class _QqbotConsolePageState extends State<QqbotConsolePage> {
                         onSelected: (v) =>
                             setState(() => _showOnlySilenced = v),
                       ),
+                      const SizedBox(width: 4),
+                      // 「可聊」开关说明 → 气泡提示（带指向箭头，数秒自动收回）
+                      Builder(
+                        builder: (helpCtx) => IconButton(
+                          visualDensity: VisualDensity.compact,
+                          tooltip: '什么是「可聊」',
+                          onPressed: () => showBubble(
+                            context,
+                            anchor: helpCtx,
+                            text: '「可聊」开关：打开 = AI 在这个群说话（加入白名单），'
+                                '关闭 = 沉默。名单为空时所有群都可聊。',
+                            visible: const Duration(seconds: 5),
+                          ),
+                          icon: Icon(Icons.help_outline_rounded,
+                              size: 18, color: Colors.grey.shade500),
+                        ),
+                      ),
                     ],
                   ),
                   const SizedBox(height: 8),
-                  Text(
-                    '「可聊」开关 = 加入聊天白名单；名单为空时所有群都可聊，'
-                    '名单非空时 AI 只在名单内的群说话',
-                    style: TextStyle(fontSize: 10.5, color: Colors.grey.shade500),
-                  ),
                   TextField(
                     onChanged: (v) => setState(() => _q = v),
                     style: const TextStyle(fontSize: 12.5),
@@ -389,16 +378,18 @@ class _QqbotConsolePageState extends State<QqbotConsolePage> {
                   child: CircularProgressIndicator(strokeWidth: 2)),
             )
           else
-            TextButton(
-              onPressed: () => _silenceFlow(g),
-              style: TextButton.styleFrom(
-                visualDensity: VisualDensity.compact,
-                foregroundColor: silenced
-                    ? const Color(0xFF34C759)
-                    : const Color(0xFFFF9500),
+            Builder(
+              builder: (btnCtx) => TextButton(
+                onPressed: () => _silenceFlow(g, anchor: btnCtx),
+                style: TextButton.styleFrom(
+                  visualDensity: VisualDensity.compact,
+                  foregroundColor: silenced
+                      ? const Color(0xFF34C759)
+                      : const Color(0xFFFF9500),
+                ),
+                child: Text(silenced ? '恢复' : '闭嘴',
+                    style: const TextStyle(fontSize: 12.5)),
               ),
-              child: Text(silenced ? '恢复' : '闭嘴',
-                  style: const TextStyle(fontSize: 12.5)),
             ),
           const SizedBox(width: 2),
           // 可聊天开关（聊天白名单）
