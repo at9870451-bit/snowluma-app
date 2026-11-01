@@ -23,12 +23,79 @@ class _QqbotConsolePageState extends State<QqbotConsolePage> {
   String _q = '';
   bool _showOnlySilenced = false;
   final Set<String> _busy = {};
+  // 聊天范围白名单（gateway /ai/chat-scope；social_pro 插件强制执行）
+  Set<String> _chatGroups = {};
+  List<String> _chatFriends = [];
+  final Set<String> _chatBusy = {};
+  bool _chatLoaded = false;
 
   @override
   void initState() {
     super.initState();
     _load();
+    _loadChatScope();
   }
+
+  /// GET /ai/chat-scope（网关存 chatGroups/chatFriends，social_pro 读它做门控）
+  Future<void> _loadChatScope() async {
+    try {
+      final api = appState.client;
+      if (api == null) return;
+      final r = await api.chatScope();
+      if (!mounted) return;
+      setState(() {
+        _chatGroups = ((r['groups'] as List?) ?? const [])
+            .map((e) => '$e').toSet();
+        _chatFriends = ((r['friends'] as List?) ?? const [])
+            .map((e) => '$e').toList();
+        _chatLoaded = true;
+      });
+    } catch (_) {
+      if (mounted) setState(() => _chatLoaded = true);
+    }
+  }
+
+  Future<void> _toggleChat(Map<String, dynamic> g) async {
+    final id = '${g['group_id']}';
+    final api = appState.client;
+    if (api == null) {
+      qSnack(context, '未连接服务器，无法修改聊天范围');
+      return;
+    }
+    if (_chatBusy.contains(id)) return;
+    final next = Set<String>.from(_chatGroups);
+    final adding = !next.contains(id);
+    if (adding) {
+      next.add(id);
+    } else {
+      next.remove(id);
+    }
+    setState(() => _chatBusy.add(id));
+    try {
+      final r =
+          await api.saveChatScope(groups: next.toList(), friends: _chatFriends);
+      if (!mounted) return;
+      if (r['ok'] == true) {
+        setState(() {
+          _chatGroups = ((r['groups'] as List?) ?? const [])
+              .map((e) => '$e').toSet();
+        });
+        qSnack(context, adding
+            ? '已加入聊天白名单，AI 会在这个群说话'
+            : '已移出白名单，AI 不再在这个群自动聊天');
+      } else {
+        qSnack(context, '${r['msg'] ?? '保存失败'}');
+      }
+    } catch (e) {
+      if (mounted) qSnack(context, '保存失败：$e');
+    } finally {
+      if (mounted) setState(() => _chatBusy.remove(id));
+    }
+  }
+
+  /// 这个群当前是否「可聊」：白名单为空 = 全部可聊
+  bool _chatOn(String id) =>
+      _chatGroups.isEmpty || _chatGroups.contains(id);
 
   Future<void> _load() async {
     setState(() {
@@ -189,7 +256,9 @@ class _QqbotConsolePageState extends State<QqbotConsolePage> {
                 children: [
                   Row(
                     children: [
-                      Text('共 ${_groups.length} 个群 · 已闭嘴 $silencedCount',
+                      Text(
+                          '共 ${_groups.length} 群 · 闭嘴 $silencedCount · '
+                          '${_chatGroups.isEmpty ? "全部可聊" : "白名单 ${_chatGroups.length} 群"}',
                           style: TextStyle(
                               fontSize: 12.5,
                               fontWeight: FontWeight.w600,
@@ -206,6 +275,11 @@ class _QqbotConsolePageState extends State<QqbotConsolePage> {
                     ],
                   ),
                   const SizedBox(height: 8),
+                  Text(
+                    '「可聊」开关 = 加入聊天白名单；名单为空时所有群都可聊，'
+                    '名单非空时 AI 只在名单内的群说话',
+                    style: TextStyle(fontSize: 10.5, color: Colors.grey.shade500),
+                  ),
                   TextField(
                     onChanged: (v) => setState(() => _q = v),
                     style: const TextStyle(fontSize: 12.5),
@@ -224,7 +298,10 @@ class _QqbotConsolePageState extends State<QqbotConsolePage> {
             ),
             Expanded(
               child: RefreshIndicator(
-                onRefresh: _load,
+                onRefresh: () async {
+                  await _load();
+                  await _loadChatScope();
+                },
                 child: visible.isEmpty
                     ? ListView(children: const [
                         SizedBox(height: 90),
@@ -323,6 +400,29 @@ class _QqbotConsolePageState extends State<QqbotConsolePage> {
               child: Text(silenced ? '恢复' : '闭嘴',
                   style: const TextStyle(fontSize: 12.5)),
             ),
+          const SizedBox(width: 2),
+          // 可聊天开关（聊天白名单）
+          Column(
+            children: [
+              Text('可聊',
+                  style:
+                      TextStyle(fontSize: 9.5, color: Colors.grey.shade500)),
+              SizedBox(
+                width: 42,
+                height: 26,
+                child: Transform.scale(
+                  scale: 0.72,
+                  child: Switch.adaptive(
+                    value: _chatOn(id),
+                    activeColor: kIosBlue,
+                    onChanged: _chatBusy.contains(id)
+                        ? null
+                        : (_) => _toggleChat(g),
+                  ),
+                ),
+              ),
+            ],
+          ),
         ],
       ),
     );
