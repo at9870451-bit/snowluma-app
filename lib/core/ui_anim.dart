@@ -30,7 +30,7 @@ Future<String?> showAnchorMenu(
   required List<QMenuItem> items,
   double width = 168,
 }) {
-  final nav = Navigator.of(context, rootOverlay: true);
+  final nav = Navigator.of(context, rootNavigator: true);
   final overlay = Overlay.of(context, rootOverlay: true);
   final rect = _rectOf(anchor);
   final size = MediaQuery.of(context).size;
@@ -136,7 +136,7 @@ Future<T?> showZoomPanel<T>(
   double widthFactor = 0.86,
   double heightFactor = 0.62,
 }) {
-  final nav = Navigator.of(context, rootOverlay: true);
+  final nav = Navigator.of(context, rootNavigator: true);
   final overlay = Overlay.of(context, rootOverlay: true);
   final begin = _rectOf(anchor);
   final size = MediaQuery.of(context).size;
@@ -213,7 +213,7 @@ Future<bool> showQConfirm(
   String confirmText = '确认',
   bool danger = false,
 }) async {
-  final nav = Navigator.of(context, rootOverlay: true);
+  final nav = Navigator.of(context, rootNavigator: true);
   final overlay = Overlay.of(context, rootOverlay: true);
   final comp = Completer<bool>();
   late final OverlayEntry entry;
@@ -405,7 +405,7 @@ void showBubble(
   bool below = true,
 }) {
   final overlay = Overlay.of(context, rootOverlay: true);
-  final nav = Navigator.of(context, rootOverlay: true);
+  final nav = Navigator.of(context, rootNavigator: true);
   final rect = _rectOf(anchor);
   final size = MediaQuery.of(context).size;
   final comp = Completer<void>();
