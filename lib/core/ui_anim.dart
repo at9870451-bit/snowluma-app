@@ -49,7 +49,7 @@ Future<String?> showAnchorMenu(
       ? (alignRight ? Alignment.topLeft : Alignment.topRight)
       : (alignRight ? Alignment.bottomLeft : Alignment.bottomRight);
 
-  void close(T? val) {
+  void close(String? val) {
     if (comp.isCompleted) return;
     ctrl.reverse().whenComplete(() {
       if (entry.mounted) entry.remove();

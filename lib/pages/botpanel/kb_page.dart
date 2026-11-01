@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/app_state.dart';
 import '../../core/qqbot_client.dart';
+import '../../core/ui_anim.dart';
 import 'q_ui.dart';
 
 /// QQBot 知识库 — 按群管理知识文档，支持新增/删除/搜索
