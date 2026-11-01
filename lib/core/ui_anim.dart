@@ -57,7 +57,7 @@ Future<String?> showAnchorMenu(
     });
   }
 
-  entry = OverlayEntry((ctx) => Stack(children: [
+  entry = OverlayEntry(builder: (ctx) => Stack(children: [
         Positioned.fill(
           child: GestureDetector(
             behavior: HitTestBehavior.opaque,
@@ -160,7 +160,7 @@ Future<T?> showZoomPanel<T>(
     });
   }
 
-  entry = OverlayEntry((ctx) => Stack(children: [
+  entry = OverlayEntry(builder: (ctx) => Stack(children: [
         Positioned.fill(
           child: GestureDetector(
             behavior: HitTestBehavior.opaque,
@@ -240,7 +240,7 @@ Future<bool> showQConfirm(
     });
   }
 
-  entry = OverlayEntry((ctx) => FadeTransition(
+  entry = OverlayEntry(builder: (ctx) => FadeTransition(
         opacity: fade,
         child: Stack(children: [
           Positioned.fill(
@@ -424,7 +424,7 @@ void showBubble(
     });
   }
 
-  entry = OverlayEntry((ctx) {
+  entry = OverlayEntry(builder: (ctx) {
     final bubbleTop = below ? rect.bottom + 10 : null;
     final bubbleBottom = below ? null : size.height - rect.top + 10;
     final left = (rect.left - 8).clamp(12.0, size.width - 260);
