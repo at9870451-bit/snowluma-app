@@ -1,4 +1,4 @@
-import 'dart:ui' as ui;
+import "dart:ui" as ui show ImageFilter, FontFeature;
 
 import 'package:flutter/material.dart';
 
@@ -9,7 +9,8 @@ import 'logs_page.dart';
 import 'processes_page.dart';
 import 'vnc_page.dart';
 
-/// RootShell — iOS 原生风格毛玻璃底部导航 + 4 个 Tab
+/// RootShell — 现代简约风底部导航 + 4 个 Tab
+/// 细节：等宽数字 / 同心圆角 / 多层柔和阴影（无边框）/ 低饱和配色
 class RootShell extends StatefulWidget {
   const RootShell({super.key});
 
@@ -29,21 +30,30 @@ class _RootShellState extends State<RootShell> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      extendBody: true,
-      body: IndexedStack(
-        index: _index,
-        children: const [
-          HomePage(),
-          ProcessesPage(),
-          AiSettingsPage(),
-          _ToolsTab(),
-        ],
+    return Theme(
+      data: Theme.of(context).copyWith(
+        textTheme: Theme.of(context).textTheme.apply(
+              fontFamily: 'SF Mono',
+              fontFamilyFallback: const ['Menlo', 'monospace'],
+            ),
       ),
-      bottomNavigationBar: _GlassNavBar(
-        tabs: _tabs,
-        index: _index,
-        onTap: (i) => setState(() => _index = i),
+      child: Scaffold(
+        extendBody: true,
+        backgroundColor: const Color(0xFFF4F5F7), // 全页浅灰底
+        body: IndexedStack(
+          index: _index,
+          children: const [
+            HomePage(),
+            ProcessesPage(),
+            AiSettingsPage(),
+            _ToolsTab(),
+          ],
+        ),
+        bottomNavigationBar: _GlassNavBar(
+          tabs: _tabs,
+          index: _index,
+          onTap: (i) => setState(() => _index = i),
+        ),
       ),
     );
   }
@@ -56,7 +66,7 @@ class _TabSpec {
   final String label;
 }
 
-/// iOS 原生风格毛玻璃导航栏（模糊 + 半透明白 + 圆角胶囊 + 阴影）
+/// 底部导航：多层柔和阴影（无边框），选中黑底胶囊，同心圆角
 class _GlassNavBar extends StatelessWidget {
   const _GlassNavBar({
     required this.tabs,
@@ -68,159 +78,283 @@ class _GlassNavBar extends StatelessWidget {
   final int index;
   final ValueChanged<int> onTap;
 
-  static const Color _iosBlue = Color(0xFF007AFF);
-
   @override
   Widget build(BuildContext context) {
     final bottomInset = MediaQuery.of(context).padding.bottom;
     return Padding(
       padding: EdgeInsets.fromLTRB(14, 0, 14, bottomInset > 0 ? bottomInset : 12),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(28),
-        child: BackdropFilter(
-          filter: ui.ImageFilter.blur(sigmaX: 30, sigmaY: 30),
-          child: Container(
-            height: 64,
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.70),
-              borderRadius: BorderRadius.circular(28),
-              border: Border.all(
-                color: Colors.white.withValues(alpha: 0.75),
-                width: 0.8,
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.10),
-                  blurRadius: 26,
-                  offset: const Offset(0, 8),
-                ),
-              ],
-            ),
-            child: Row(
-              children: List.generate(tabs.length, (i) {
-                final t = tabs[i];
-                final selected = i == index;
-                return Expanded(
-                  child: GestureDetector(
-                    behavior: HitTestBehavior.opaque,
-                    onTap: () => onTap(i),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
+      child: Container(
+        height: 64,
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.88),
+          borderRadius: BorderRadius.circular(26), // 同心：外层26 = 内层胶囊20 + padding 6
+          boxShadow: [
+            // 多层柔和阴影代替实线边框
+            BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 8, offset: const Offset(0, 2)),
+            BoxShadow(color: Colors.black.withValues(alpha: 0.07), blurRadius: 20, offset: const Offset(0, 8)),
+            BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 40, offset: const Offset(0, 18)),
+          ],
+        ),
+        child: Row(
+          children: List.generate(tabs.length, (i) {
+            final on = i == index;
+            final t = tabs[i];
+            return Expanded(
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: () => onTap(i),
+                child: Center(
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 260),
+                    curve: Curves.easeOutCubic,
+                    padding: EdgeInsets.symmetric(horizontal: on ? 18 : 8, vertical: 8),
+                    decoration: BoxDecoration(
+                      // 选中标签变黑（黑白两档主次）
+                      color: on ? const Color(0xFF17181C) : Colors.transparent,
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(
-                          selected ? t.activeIcon : t.icon,
-                          size: 23,
-                          color: selected
-                              ? _iosBlue
-                              : const Color(0xFF8E8E93),
-                        ),
-                        const SizedBox(height: 3),
-                        Text(
-                          t.label,
-                          style: TextStyle(
-                            fontSize: 10.5,
-                            fontWeight:
-                                selected ? FontWeight.w600 : FontWeight.w500,
-                            color: selected
-                                ? _iosBlue
-                                : const Color(0xFF8E8E93),
-                          ),
+                        Icon(on ? t.activeIcon : t.icon,
+                            size: 20, color: on ? Colors.white : const Color(0xFF9AA1AD)),
+                        AnimatedSize(
+                          duration: const Duration(milliseconds: 240),
+                          curve: Curves.easeOutCubic,
+                          child: on
+                              ? Padding(
+                                  padding: const EdgeInsets.only(left: 6),
+                                  child: Text(t.label,
+                                      style: const TextStyle(
+                                          color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600)),
+                                )
+                              : const SizedBox.shrink(),
                         ),
                       ],
                     ),
                   ),
-                );
-              }),
-            ),
-          ),
+                ),
+              ),
+            );
+          }),
         ),
       ),
     );
   }
 }
 
-/// 工具 Tab — 动作调试 / 系统信息 / 扫码登录入口
+/// 工具 Tab：大字标题 + 搜索栏 + 黑圆筛选钮 + 通栏大图列表（错开入场）
 class _ToolsTab extends StatelessWidget {
   const _ToolsTab();
 
   @override
   Widget build(BuildContext context) {
-    final text = Theme.of(context).textTheme;
+    final entries = [
+      ('动作调试', 'OneBot 动作清单 · 参数构建', 'OPS', const ActionsPage()),
+      ('系统信息', '服务状态 · 认证 · 协议版本', 'SYS', const LogsPage()),
+      ('扫码登录', '远程桌面 + 二维码', 'QR', const VncPage()),
+    ];
     return Scaffold(
-      appBar: AppBar(title: const Text('工具')),
+      backgroundColor: const Color(0xFFF4F5F7),
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        title: const Text(
+          'SnowLuma\n工具',
+          style: TextStyle(
+            fontSize: 24,
+            fontWeight: FontWeight.w800,
+            height: 1.12,
+            color: Color(0xFF17181C),
+            letterSpacing: -0.3,
+          ),
+        ),
+      ),
       body: SafeArea(
         bottom: false,
         child: ListView(
-          padding: const EdgeInsets.fromLTRB(12, 8, 12, 120),
+          padding: const EdgeInsets.fromLTRB(14, 4, 14, 120),
           children: [
-            _tile(
-              context,
-              icon: Icons.play_circle_outline_rounded,
-              title: '动作调试',
-              subtitle: 'OneBot 动作清单 + 参数构建 + 调用结果',
-              page: const ActionsPage(),
-            ),
-            _tile(
-              context,
-              icon: Icons.article_outlined,
-              title: '系统信息',
-              subtitle: '服务状态 / 认证 / 协议 / 核心版本',
-              page: const LogsPage(),
-            ),
-            _tile(
-              context,
-              icon: Icons.qr_code_2_rounded,
-              title: '扫码登录 QQ',
-              subtitle: '远程桌面 + 二维码',
-              page: const VncPage(),
+            // 搜索栏 + 黑圆筛选钮
+            Row(
+              children: [
+                Expanded(
+                  child: Container(
+                    height: 44,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(22),
+                      boxShadow: [
+                        BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 10, offset: const Offset(0, 4)),
+                      ],
+                    ),
+                    padding: const EdgeInsets.symmetric(horizontal: 14),
+                    alignment: Alignment.centerLeft,
+                    child: const Text('搜索功能…', style: TextStyle(color: Color(0xFF9AA1AD), fontSize: 13)),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: const BoxDecoration(
+                    color: Color(0xFF17181C), // 黑圆筛选钮
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.tune_rounded, color: Colors.white, size: 20),
+                ),
+              ],
             ),
             const SizedBox(height: 14),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 6),
-              child: Text(
-                '提示：QQBot 管理中心在「账号」Tab；底部导航为 iOS 毛玻璃风格，4 个 Tab 分别为 账号 / 接入 / AI / 工具。',
-                style: text.bodySmall?.copyWith(color: Colors.grey.shade600),
+            // 通栏大图列表（错开入场）
+            for (var i = 0; i < entries.length; i++) ...[
+              _StaggerIn(
+                delay: Duration(milliseconds: 90 * i),
+                child: _BigCard(
+                  title: entries[i].$1,
+                  subtitle: entries[i].$2,
+                  badge: entries[i].$3,
+                  page: entries[i].$4,
+                ),
               ),
-            ),
+              const SizedBox(height: 12),
+            ],
           ],
         ),
       ),
     );
   }
+}
 
-  Widget _tile(BuildContext context,
-      {required IconData icon,
-      required String title,
-      required String subtitle,
-      required Widget page}) {
-    return Card(
-      elevation: 0,
-      margin: const EdgeInsets.only(bottom: 10),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: Colors.grey.shade200),
+/// 错开延迟入场
+class _StaggerIn extends StatefulWidget {
+  const _StaggerIn({required this.delay, required this.child});
+  final Duration delay;
+  final Widget child;
+
+  @override
+  State<_StaggerIn> createState() => _StaggerInState();
+}
+
+class _StaggerInState extends State<_StaggerIn>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _c =
+      AnimationController(vsync: this, duration: const Duration(milliseconds: 520))
+        ..forward();
+  late final Animation<double> _a = CurvedAnimation(parent: _c, curve: Curves.easeOutCubic);
+
+  @override
+  void initState() {
+    super.initState();
+    Future.delayed(widget.delay, () {
+      if (mounted) setState(() {});
+    });
+  }
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _a,
+      builder: (_, child) => Opacity(
+        opacity: _a.value,
+        child: Transform.translate(offset: Offset(0, 16 * (1 - _a.value)), child: child),
       ),
-      child: ListTile(
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-        leading: Container(
-          width: 38,
-          height: 38,
-          decoration: BoxDecoration(
-            color: const Color(0xFF007AFF).withValues(alpha: 0.10),
-            borderRadius: BorderRadius.circular(11),
-          ),
-          child: Icon(icon, size: 20, color: const Color(0xFF007AFF)),
+      child: widget.child,
+    );
+  }
+}
+
+/// 通栏大图卡片：黑底头部块叠信息 + 底部信息条（等宽数字徽标）
+class _BigCard extends StatelessWidget {
+  const _BigCard({
+    required this.title,
+    required this.subtitle,
+    required this.badge,
+    required this.page,
+  });
+
+  final String title;
+  final String subtitle;
+  final String badge;
+  final Widget page;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: () => Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => page),
+      ),
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(22),
+          boxShadow: [
+            BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 10, offset: const Offset(0, 3)),
+            BoxShadow(color: Colors.black.withValues(alpha: 0.06), blurRadius: 26, offset: const Offset(0, 12)),
+          ],
         ),
-        title: Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
-        subtitle: Text(subtitle,
-            style: Theme.of(context)
-                .textTheme
-                .bodySmall
-                ?.copyWith(color: Colors.grey.shade600)),
-        trailing: const Icon(Icons.chevron_right_rounded,
-            size: 20, color: Color(0xFFC7C7CC)),
-        onTap: () => Navigator.of(context).push(
-          MaterialPageRoute(builder: (_) => page),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // 黑底头部块叠信息
+            Container(
+              height: 96,
+              decoration: const BoxDecoration(
+                color: Color(0xFF17181C),
+                borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+              ),
+              padding: const EdgeInsets.all(14),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(title,
+                            style: const TextStyle(
+                                color: Colors.white, fontSize: 17, fontWeight: FontWeight.w700)),
+                        const SizedBox(height: 4),
+                        Text(subtitle,
+                            style: TextStyle(
+                                color: Colors.white.withValues(alpha: 0.55), fontSize: 12)),
+                      ],
+                    ),
+                  ),
+                  // 等宽数字徽标
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.08),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(badge,
+                        style: const TextStyle(
+                            color: Colors.white, fontSize: 12,
+                            fontFeatures: [FontFeature.tabularFigures()])),
+                  ),
+                ],
+              ),
+            ),
+            // 底部信息条
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+              child: Row(
+                children: [
+                  const Text('进入',
+                      style: TextStyle(fontSize: 12, color: Color(0xFF9AA1AD))),
+                  const Spacer(),
+                  const Icon(Icons.arrow_forward_rounded, size: 16, color: Color(0xFF17181C)),
+                ],
+              ),
+            ),
+          ],
         ),
       ),
     );

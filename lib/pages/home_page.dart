@@ -1,3 +1,4 @@
+import 'dart:ui' show FontFeature;
 import 'package:flutter/material.dart';
 
 import '../core/app_state.dart';
@@ -70,6 +71,7 @@ class _HomePageState extends State<HomePage> {
     final theme = Theme.of(context);
     final text = theme.textTheme;
     return Scaffold(
+      backgroundColor: const Color(0xFFF4F5F7),
       appBar: AppBar(
         title: const Text('SnowLuma'),
         actions: [
@@ -184,53 +186,79 @@ class _HomePageState extends State<HomePage> {
     final s = _status;
     final running = s?['status'] == 'running';
     final ver = SnowLumaBridge.call('core.version');
-    return Card(
+    return Container(
       margin: const EdgeInsets.all(12),
-      elevation: 0,
-      shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-          side: BorderSide(color: Colors.grey.shade300)),
-      child: Padding(
-        padding: const EdgeInsets.all(14),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Container(
-                  width: 10,
-                  height: 10,
-                  decoration: BoxDecoration(
-                    color: running ? Colors.green : Colors.grey,
-                    shape: BoxShape.circle,
-                  ),
+      decoration: BoxDecoration(
+        // 核心模块黑底白字（黑白两档主次）
+        color: const Color(0xFF17181C),
+        borderRadius: BorderRadius.circular(22),
+        boxShadow: [
+          BoxShadow(color: Colors.black.withValues(alpha: 0.18), blurRadius: 14, offset: const Offset(0, 6)),
+          BoxShadow(color: Colors.black.withValues(alpha: 0.10), blurRadius: 34, offset: const Offset(0, 16)),
+        ],
+      ),
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 10,
+                height: 10,
+                decoration: BoxDecoration(
+                  color: running ? const Color(0xFF4ADE80) : const Color(0xFF6B7280),
+                  shape: BoxShape.circle,
+                  boxShadow: running
+                      ? [BoxShadow(color: const Color(0xFF4ADE80).withValues(alpha: 0.5), blurRadius: 10)]
+                      : null,
                 ),
-                const SizedBox(width: 8),
-                Text(running ? '服务运行中' : '服务未就绪',
-                    style: text.titleSmall),
-                const Spacer(),
-                Text(appState.serverLabel,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: text.bodySmall?.copyWith(color: Colors.grey.shade600)),
-              ],
-            ),
-            const SizedBox(height: 10),
-            Wrap(
-              spacing: 16,
-              runSpacing: 4,
-              children: [
-                _kv(text, '账号数', '${_accounts.length}'),
-                _kv(text, 'Rust Core', 'v${ver['version']}'),
-                _kv(text, '平台', ver['platform'] as String? ?? '-'),
-              ],
-            ),
-          ],
-        ),
+              ),
+              const SizedBox(width: 8),
+              Text(running ? '服务运行中' : '服务未就绪',
+                  style: const TextStyle(
+                      color: Colors.white, fontSize: 15, fontWeight: FontWeight.w700)),
+              const Spacer(),
+              Text(appState.serverLabel,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(color: Colors.white.withValues(alpha: 0.45), fontSize: 11)),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              _kv('账号数', '${_accounts.length}'),
+              const SizedBox(width: 22),
+              _kv('Rust Core', 'v${ver['version']}'),
+              const Spacer(),
+              Text(ver['platform'] as String? ?? '-',
+                  style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 12,
+                      fontFeatures: [FontFeature.tabularFigures()])),
+            ],
+          ),
+        ],
       ),
     );
   }
 
+  Widget _kv(String k, String v) => Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(k,
+              style: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.45), fontSize: 10)),
+          const SizedBox(height: 2),
+          Text(v,
+              style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                  fontFeatures: [FontFeature.tabularFigures()])),
+        ],
+      );
   Widget _kv(TextTheme text, String k, String v) => Row(
         children: [
           Text(k + '：',
