@@ -85,18 +85,6 @@ class _HomePageState extends State<HomePage> {
           PopupMenuButton<String>(
             onSelected: (v) async {
               switch (v) {
-                case 'processes':
-                  Navigator.of(context).push(
-                    MaterialPageRoute(builder: (_) => const ProcessesPage()),
-                  );
-                case 'actions':
-                  Navigator.of(context).push(
-                    MaterialPageRoute(builder: (_) => const ActionsPage()),
-                  );
-                case 'logs':
-                  Navigator.of(context).push(
-                    MaterialPageRoute(builder: (_) => const LogsPage()),
-                  );
                 case 'logout':
                   await appState.disconnect();
                   if (mounted) Navigator.of(context).pushAndRemoveUntil(
@@ -106,15 +94,7 @@ class _HomePageState extends State<HomePage> {
               }
             },
             itemBuilder: (_) => [
-              const PopupMenuItem(value: 'processes', child: ListTile(
-                  leading: Icon(Icons.dns_outlined),
-                  title: Text('接入 QQ'), dense: true, contentPadding: EdgeInsets.zero)),
-              const PopupMenuItem(value: 'actions', child: ListTile(
-                  leading: Icon(Icons.play_circle_outline),
-                  title: Text('动作调试'), dense: true, contentPadding: EdgeInsets.zero)),
-              const PopupMenuItem(value: 'logs', child: ListTile(
-                  leading: Icon(Icons.article_outlined),
-                  title: Text('系统信息'), dense: true, contentPadding: EdgeInsets.zero)),
+              // 动作调试/系统信息/扫码登录 已统一收口到「工具」Tab，避免与工具页重复
               const PopupMenuItem(value: 'logout', child: ListTile(
                   leading: Icon(Icons.logout),
                   title: Text('退出登录', style: TextStyle(color: Colors.red)),
