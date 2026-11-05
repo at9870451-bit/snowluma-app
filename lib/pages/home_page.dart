@@ -228,9 +228,9 @@ class _HomePageState extends State<HomePage> {
           const SizedBox(height: 14),
           Row(
             children: [
-              _kv('账号数', '${_accounts.length}'),
+              _kvBig('账号数', '${_accounts.length}'),
               const SizedBox(width: 22),
-              _kv('Rust Core', 'v${ver['version']}'),
+              _kvBig('Rust Core', 'v${ver['version']}'),
               const Spacer(),
               Text(ver['platform'] as String? ?? '-',
                   style: const TextStyle(
@@ -244,7 +244,7 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  Widget _kv(String k, String v) => Column(
+  Widget _kvBig(String k, String v) => Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(k,
