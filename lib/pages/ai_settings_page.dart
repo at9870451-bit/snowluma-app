@@ -1581,7 +1581,7 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
                 children: [
                   Expanded(
                     child: DropdownButtonFormField<String>(
-                      initialValue: _cloneProvType,
+                      value: _cloneProvType,
                       isDense: true,
                       decoration: const InputDecoration(
                           isDense: true, border: OutlineInputBorder()),
@@ -1662,7 +1662,7 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
               const SizedBox(width: 6),
               Expanded(
                 child: DropdownButtonFormField<int>(
-                  initialValue: _autoLearnHours,
+                  value: _autoLearnHours,
                   isDense: true,
                   items: const [
                     DropdownMenuItem(value: 2, child: Text('每 2 小时')),
@@ -1769,7 +1769,7 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 4),
               child: DropdownButtonFormField<String>(
-                initialValue: _rtVoices.any((v) => v['id'] == _rtVoice)
+                value: _rtVoices.any((v) => v['id'] == _rtVoice)
                     ? _rtVoice
                     : (_rtVoices.isNotEmpty
                         ? _rtVoices.first['id'] as String
@@ -1817,7 +1817,7 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
                 const SizedBox(width: 8),
                 Expanded(
                   child: DropdownButtonFormField<String>(
-                    initialValue: _rtMode,
+                    value: _rtMode,
                     isDense: true,
                     items: const [
                       DropdownMenuItem(value: 'voice', child: Text('只发语音')),
@@ -1889,7 +1889,7 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
                 const SizedBox(width: 8),
                 Expanded(
                   child: DropdownButtonFormField<String>(
-                    initialValue: _voiceResponseFormat,
+                    value: _voiceResponseFormat,
                     isDense: true,
                     items: const [
                       DropdownMenuItem(value: 'url', child: Text('url（返回音频链接）')),
@@ -1941,7 +1941,7 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
                 const SizedBox(width: 8),
                 Expanded(
                   child: DropdownButtonFormField<String>(
-                    initialValue: _visionResponseFormat,
+                    value: _visionResponseFormat,
                     isDense: true,
                     items: const [
                       DropdownMenuItem(value: 'url', child: Text('url（图片以链接传入）')),
@@ -2151,7 +2151,7 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
             const SizedBox(width: 10),
             Expanded(
               child: DropdownButtonFormField<String>(
-                initialValue: _gender.isEmpty ? '' : _gender,
+                value: _gender.isEmpty ? '' : _gender,
                 decoration: const InputDecoration(
                   labelText: '性别',
                   prefixIcon: Icon(Icons.person_outline),
