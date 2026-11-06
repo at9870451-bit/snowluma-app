@@ -134,11 +134,11 @@ class _QqbotMarketPageState extends State<QqbotMarketPage> {
               TextField(
                 onChanged: (v) => setState(() => _q = v),
                 style: const TextStyle(fontSize: 12.5),
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   isDense: true,
                   hintText: '搜索插件名 / 说明',
-                  prefixIcon: Icon(Icons.search, size: 18),
-                  contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+                  prefixIcon: const Icon(Icons.search, size: 18),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(9)),
                 ),
               ),
