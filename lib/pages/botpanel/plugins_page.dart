@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../core/app_state.dart';
 import '../../core/qqbot_client.dart';
 import '../../core/ui_anim.dart';
+import 'market_page.dart';
 import 'q_ui.dart';
 
 /// QQBot 插件管理 — 已加载/已停用插件列表，开关与重载
@@ -244,6 +245,13 @@ class _QqbotPluginsPageState extends State<QqbotPluginsPage> {
       appBar: AppBar(
         title: const Text('插件管理'),
         actions: [
+          IconButton(
+            tooltip: '插件市场',
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const QqbotMarketPage()),
+            ),
+            icon: const Icon(Icons.storefront_outlined),
+          ),
           IconButton(
             tooltip: '刷新',
             onPressed: _loading ? null : _load,

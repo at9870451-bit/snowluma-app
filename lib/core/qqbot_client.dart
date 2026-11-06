@@ -214,6 +214,15 @@ class QqbotClient {
   Future<Map<String, dynamic>> pluginReload(String name) =>
       _post('/api/plugins/$name/reload', timeout: const Duration(seconds: 30));
 
+  /// GET /api/plugins/market/list → {ok, items:[{name, display, description, version, size, installed, disabled}]}
+  Future<Map<String, dynamic>> marketList() =>
+      _get('/api/plugins/market/list');
+
+  /// POST /api/plugins/market/install {name} → {ok, steps, loaded}
+  Future<Map<String, dynamic>> marketInstall(String name) =>
+      _post('/api/plugins/market/install',
+          body: {'name': name}, timeout: const Duration(seconds: 120));
+
   // ==================== P1 · 原始配置（AI / 生图只读展示） ====================
 
   /// GET /api/config → 完整配置（含 ai / image / custom 等段）
