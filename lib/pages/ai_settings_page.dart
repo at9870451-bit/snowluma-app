@@ -1092,21 +1092,32 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
                 ),
               ),
             ),
-            bottomNavigationBar: showSaveArea
-                ? SafeArea(top: false, child: _saveArea())
-                : null,
             body: _loading
                 ? const Center(child: CircularProgressIndicator())
                 : SafeArea(
                     top: false,
-                    bottom: !showSaveArea,
-                    child: TabBarView(
+                    child: Column(
                       children: [
-                        _KeepAliveAiTab(key: const ValueKey('model'), child: _baseTab()),
-                        _KeepAliveAiTab(key: const ValueKey('persona'), child: _personaTab()),
-                        _KeepAliveAiTab(key: const ValueKey('trigger'), child: _triggerTab()),
-                        _KeepAliveAiTab(key: const ValueKey('media'), child: _mediaTab()),
-                        _KeepAliveAiTab(key: const ValueKey('tools'), child: _toolsTab()),
+                        Expanded(
+                          child: TabBarView(
+                            children: [
+                              _KeepAliveAiTab(
+                                  key: const ValueKey('model'), child: _baseTab()),
+                              _KeepAliveAiTab(
+                                  key: const ValueKey('persona'),
+                                  child: _personaTab()),
+                              _KeepAliveAiTab(
+                                  key: const ValueKey('trigger'),
+                                  child: _triggerTab()),
+                              _KeepAliveAiTab(
+                                  key: const ValueKey('media'), child: _mediaTab()),
+                              _KeepAliveAiTab(
+                                  key: const ValueKey('tools'), child: _toolsTab()),
+                            ],
+                          ),
+                        ),
+                        // 保存栏固定在页面底部（键盘打开时隐藏，避免遮挡输入）
+                        if (showSaveArea) SafeArea(top: false, child: _saveArea()),
                       ],
                     ),
                   ),
