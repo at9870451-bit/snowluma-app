@@ -639,7 +639,7 @@ class _FilterButton extends StatelessWidget {
               width: 8,
               height: 8,
               decoration: BoxDecoration(
-                  color: style_core.SnowStyle.accent, shape: BoxShape.circle),
+                  color: SnowStyle.accent, shape: BoxShape.circle),
             ),
           ),
       ],
