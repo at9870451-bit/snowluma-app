@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 
-/// QQBot 管理页共用 UI 组件（与 App 现有 iOS 风格保持一致）
+import '../../core/snow_theme.dart';
 
-const kIosBlue = Color(0xFF007AFF);
+/// QQBot 管理页共享组件；保持现有页面与数据接口不变。
+const kIosBlue = SnowStyle.accent;
 
-/// 统一的卡片外壳：白底、圆角 16、细灰边、无阴影
+/// 白色卡片：同心圆角及柔和的多层阴影。
 class QCard extends StatelessWidget {
   const QCard({super.key, required this.child, this.padding});
 
@@ -15,13 +16,9 @@ class QCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
-      margin: const EdgeInsets.only(bottom: 10),
-      padding: padding ?? const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.grey.shade200),
-      ),
+      margin: const EdgeInsets.only(bottom: 14),
+      padding: padding ?? const EdgeInsets.all(16),
+      decoration: SnowStyle.card(),
       child: child,
     );
   }
@@ -47,7 +44,10 @@ class StatTile extends StatelessWidget {
       children: [
         Text(value,
             style: TextStyle(
-                fontSize: 22, fontWeight: FontWeight.w700, color: color)),
+                fontSize: 22,
+                fontWeight: FontWeight.w700,
+                fontFeatures: SnowStyle.tabular,
+                color: color)),
         const SizedBox(height: 2),
         Text(label,
             style: TextStyle(fontSize: 11.5, color: Colors.grey.shade600)),

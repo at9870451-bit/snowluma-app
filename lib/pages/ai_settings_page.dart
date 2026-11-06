@@ -124,6 +124,52 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
   static const _localBase = 'http://127.0.0.1:11434/v1';
   static const _localModel = 'qwen2.5:0.5b';
 
+  // 控制器属于页面而非可回收的列表项；重建、切换分类不重置输入/光标。
+  final Map<String, TextEditingController> _textControllers = {};
+  final Set<String> _editedTextKeys = {};
+
+  TextEditingController _textController(String key, String initial) =>
+      _textControllers.putIfAbsent(key, () => TextEditingController(text: initial));
+
+  void _setText(String key, String value, {bool edited = false}) {
+    if (edited) _editedTextKeys.add(key);
+    final controller = _textControllers[key];
+    if (controller != null && controller.text != value) {
+      controller.value = TextEditingValue(
+        text: value,
+        selection: TextSelection.collapsed(offset: value.length),
+      );
+    }
+  }
+
+  // 后台刷新只更新未编辑的文本；显式“重新读取”会先清除编辑标记。
+  String _incomingText(String key, String current, String incoming) {
+    if (_editedTextKeys.contains(key)) return current;
+    _setText(key, incoming);
+    return incoming;
+  }
+
+  int _incomingInt(String key, int current, int incoming) {
+    if (_editedTextKeys.contains(key)) return current;
+    _setText(key, '$incoming');
+    return incoming;
+  }
+
+  Future<void> _reloadConfig() {
+    _editedTextKeys.clear();
+    return _load();
+  }
+
+  @override
+  void dispose() {
+    for (final controller in _textControllers.values) {
+      controller.dispose();
+    }
+    _learnUrl.dispose();
+    _learnText.dispose();
+    super.dispose();
+  }
+
   @override
   void initState() {
     super.initState();
@@ -945,56 +991,129 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
     }
   }
 
+  static const _accent = Color(0xFF505CC2);
+  static const _ink = Color(0xFF1D1F25);
+
   @override
   Widget build(BuildContext context) {
-    return DefaultTabController(
-      length: 4,
-      child: Scaffold(
-        appBar: AppBar(
-          title: const Text('AI 助手设置'),
-          actions: [
-            IconButton(
-              tooltip: '保存设置',
-              onPressed: (_saving || _loading) ? null : _save,
-              icon: _saving
-                  ? const SizedBox(
-                      width: 18, height: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2))
-                  : const Icon(Icons.save_outlined),
+    final baseTheme = Theme.of(context);
+    final border = OutlineInputBorder(
+      borderRadius: BorderRadius.circular(13),
+      borderSide: BorderSide.none,
+    );
+    final buttonShape = RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(13),
+    );
+    return LayoutBuilder(builder: (context, constraints) {
+      // 根导航的 Scaffold 会提前消耗 viewInsets；同时检查实际视图的键盘。
+      final media = MediaQuery.of(context);
+      final keyboardOpen = media.viewInsets.bottom > 0 ||
+          View.of(context).viewInsets.bottom > 0;
+      final showSaveArea = !keyboardOpen && constraints.maxHeight >= 380;
+      return Theme(
+        data: baseTheme.copyWith(
+          colorScheme: baseTheme.colorScheme.copyWith(primary: _accent),
+          scaffoldBackgroundColor: const Color(0xFFF4F5F7),
+          inputDecorationTheme: InputDecorationTheme(
+            filled: true,
+            fillColor: const Color(0xFFF5F6F9),
+            isDense: true,
+            contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 15),
+            border: border,
+            enabledBorder: border,
+            focusedBorder: border.copyWith(
+              borderSide: const BorderSide(color: _accent, width: 1.4),
             ),
-          ],
-          bottom: PreferredSize(
-            preferredSize: const Size.fromHeight(40),
-            child: TabBar(
-              isScrollable: true,
-              tabAlignment: TabAlignment.start,
-              labelColor: const Color(0xFF007AFF),
-              unselectedLabelColor: Colors.grey,
-              indicatorColor: const Color(0xFF007AFF),
-              indicatorSize: TabBarIndicatorSize.label,
-              tabs: const [
-                Tab(text: '模型'),
-                Tab(text: '人设'),
-                Tab(text: '触发'),
-                Tab(text: '语音·照片'),
-                Tab(text: '工具'),
-              ],
+          ),
+          listTileTheme: const ListTileThemeData(
+            contentPadding: EdgeInsets.zero,
+            iconColor: Color(0xFF777C8A),
+          ),
+          filledButtonTheme: FilledButtonThemeData(
+            style: FilledButton.styleFrom(
+              minimumSize: const Size(0, 44),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              shape: buttonShape,
+            ),
+          ),
+          outlinedButtonTheme: OutlinedButtonThemeData(
+            style: OutlinedButton.styleFrom(
+              minimumSize: const Size(0, 44),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              shape: buttonShape,
             ),
           ),
         ),
-        body: _loading
-            ? const Center(child: CircularProgressIndicator())
-            : TabBarView(
-                children: [
-                  _baseTab(),
-                  _personaTab(),
-                  _triggerTab(),
-                  _mediaTab(),
-                  _toolsTab(),
-                ],
+        child: DefaultTabController(
+          length: 5,
+          child: Scaffold(
+            appBar: AppBar(
+              backgroundColor: const Color(0xFFF4F5F7),
+              surfaceTintColor: Colors.transparent,
+              elevation: 0,
+              title: const Text('AI 助手设置',
+                  style: TextStyle(color: _ink, fontWeight: FontWeight.w700)),
+              actions: [
+                // 键盘打开或横屏空间不足时，顶部仍可保存。
+                IconButton(
+                  tooltip: '保存主配置',
+                  onPressed: (_saving || _loading) ? null : _save,
+                  icon: _saving
+                      ? const SizedBox(
+                          width: 18, height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2))
+                      : const Icon(Icons.save_outlined),
+                ),
+              ],
+              bottom: PreferredSize(
+                preferredSize: const Size.fromHeight(52),
+                child: TabBar(
+                  isScrollable: true,
+                  tabAlignment: TabAlignment.start,
+                  padding: const EdgeInsets.fromLTRB(12, 0, 12, 6),
+                  labelPadding: const EdgeInsets.symmetric(horizontal: 15),
+                  labelStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+                  unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.w500, fontSize: 13),
+                  labelColor: _accent,
+                  unselectedLabelColor: const Color(0xFF737887),
+                  dividerColor: Colors.transparent,
+                  indicatorSize: TabBarIndicatorSize.tab,
+                  indicator: BoxDecoration(
+                    color: const Color(0xFFE8EAF9),
+                    borderRadius: BorderRadius.circular(13),
+                  ),
+                  tabs: const [
+                    Tab(text: '模型'),
+                    Tab(text: '人设'),
+                    Tab(text: '触发'),
+                    Tab(text: '语音·照片'),
+                    Tab(text: '工具'),
+                  ],
+                ),
               ),
-      ),
-    );
+            ),
+            bottomNavigationBar: showSaveArea
+                ? SafeArea(top: false, child: _saveArea())
+                : null,
+            body: _loading
+                ? const Center(child: CircularProgressIndicator())
+                : SafeArea(
+                    top: false,
+                    bottom: !showSaveArea,
+                    child: TabBarView(
+                      children: [
+                        _KeepAliveAiTab(key: const ValueKey('model'), child: _baseTab()),
+                        _KeepAliveAiTab(key: const ValueKey('persona'), child: _personaTab()),
+                        _KeepAliveAiTab(key: const ValueKey('trigger'), child: _triggerTab()),
+                        _KeepAliveAiTab(key: const ValueKey('media'), child: _mediaTab()),
+                        _KeepAliveAiTab(key: const ValueKey('tools'), child: _toolsTab()),
+                      ],
+                    ),
+                  ),
+          ),
+        ),
+      );
+    });
   }
 
   Widget _messageBar() {
@@ -1008,25 +1127,82 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
     );
   }
 
-  Widget _saveButton() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 10),
-      child: FilledButton(
-        onPressed: _saving ? null : _save,
-        child: _saving
-            ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
-            : const Text('保存设置'),
-      ),
-    );
+  Widget _saveArea() => Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          boxShadow: [
+            BoxShadow(color: Color(0x10000000), blurRadius: 20, offset: Offset(0, -4)),
+          ],
+        ),
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 760),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  const Text('主配置统一保存；音色、开话题等模块需单独保存',
+                      style: TextStyle(fontSize: 11, color: Color(0xFF737887))),
+                  const SizedBox(height: 6),
+                  FilledButton.icon(
+                    onPressed: (_saving || _loading) ? null : _save,
+                    icon: _saving
+                        ? const SizedBox(width: 18, height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2))
+                        : const Icon(Icons.check_rounded, size: 20),
+                    label: Text(_saving ? '正在保存…' : '保存主配置'),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+
+  Widget _settingsList({required String keyName, required List<Widget> children}) {
+    return LayoutBuilder(builder: (context, constraints) {
+      final side = constraints.maxWidth > 792
+          ? (constraints.maxWidth - 760) / 2
+          : 16.0;
+      return ListView(
+        key: PageStorageKey<String>('ai-settings-$keyName'),
+        keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.manual,
+        padding: EdgeInsets.fromLTRB(side, 12, side, 24),
+        children: children,
+      );
+    });
   }
+
+  Widget _settingsGroup(String title, List<Widget> children) => Container(
+        margin: const EdgeInsets.only(bottom: 14),
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 14),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: const [
+            BoxShadow(color: Color(0x0C17181C), blurRadius: 18, offset: Offset(0, 6)),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(title, style: const TextStyle(
+                color: _ink, fontSize: 15, fontWeight: FontWeight.w700)),
+            const SizedBox(height: 12),
+            ...children,
+          ],
+        ),
+      );
 
   // ---------- Tab 1：模型 ----------
   Widget _baseTab() {
-    return ListView(
-      padding: const EdgeInsets.all(16),
+    return _settingsList(
+      keyName: 'model',
       children: [
         _messageBar(),
-        _section('模型来源（二选一，互斥）'),
+        _settingsGroup('模型来源（二选一，互斥）', [
         SwitchListTile(
           value: _useLocal,
           onChanged: (v) => setState(() {
@@ -1069,14 +1245,16 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
           contentPadding: EdgeInsets.zero,
         ),
         const SizedBox(height: 4),
-        _section('开关'),
+        ]),
+        _settingsGroup('开关', [
         SwitchListTile(
           value: _enabled,
           onChanged: (v) => setState(() => _enabled = v),
           title: const Text('启用 AI 自动回复'),
           subtitle: const Text('QQ 收到消息后由 AI 按人设自动回复'),
         ),
-        _section('模型接口（OpenAI 兼容）'),
+        ]),
+        _settingsGroup('模型接口（OpenAI 兼容）', [
         _field('API 地址', _baseUrl, (v) => _baseUrl = v),
         Row(
           children: [
@@ -1110,11 +1288,11 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
           ),
         ),
         _field('API Key', _apiKey, (v) => _apiKey = v, obscure: true, hint: 'sk-…'),
-        _section('参数'),
+        ]),
+        _settingsGroup('参数', [
         _slider('回复随机度', _temperature, 0.0, 1.5, (v) => _temperature = v),
         _slider('最大长度', _maxTokens.toDouble(), 100, 2000, (v) => _maxTokens = v.toInt()),
-        _saveButton(),
-        const SizedBox(height: 24),
+        ]),
       ],
     );
   }
@@ -1179,30 +1357,31 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
 
   // ---------- Tab 2：人设 ----------
   Widget _personaTab() {
-    return ListView(
-      padding: const EdgeInsets.all(16),
+    return _settingsList(
+      keyName: 'persona',
       children: [
         _messageBar(),
-        _section('人设（Persona）'),
+        _settingsGroup('人设（Persona）', [
         _personaField(),
         _ageGenderRow(),
-        _section('回复风格'),
+        ]),
+        _settingsGroup('回复风格', [
         _styleTile(),
-        _section('主人权限'),
+        ]),
+        _settingsGroup('主人权限', [
         _masterField(),
-        _saveButton(),
-        const SizedBox(height: 24),
+        ]),
       ],
     );
   }
 
   // ---------- Tab 3：触发 ----------
   Widget _triggerTab() {
-    return ListView(
-      padding: const EdgeInsets.all(16),
+    return _settingsList(
+      keyName: 'trigger',
       children: [
         _messageBar(),
-        _section('自主模式'),
+        _settingsGroup('自主模式', [
         _selfModeTile(),
         _triggerTile(Icons.touch_app_outlined, '被戳一戳时', _triggerPoke, (v) => _triggerPoke = v),
         _triggerTile(Icons.person_pin_outlined, '被@时', _triggerAt, (v) => _triggerAt = v),
@@ -1216,7 +1395,8 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
           child: Text('@了本人必回；未启用自主模式时群消息默认全部回复。',
               style: TextStyle(fontSize: 11, color: Colors.grey)),
         ),
-        _section('学习与防 AI 感'),
+        ]),
+        _settingsGroup('学习与防 AI 感', [
         _triggerTile(Icons.school_outlined, '学习真人聊天（越聊越像真人）', _learnFromChat,
             (v) => setState(() => _learnFromChat = v)),
         Padding(
@@ -1245,13 +1425,15 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
               ],
             ),
           ),
-        _section('话痨连发 · 随机@ · 主动发言'),
+        ]),
+        _settingsGroup('话痨连发 · 随机@ · 主动发言', [
         _numField('连发概率 %（0=关，命中后回复拆成多条单行连发）', _multiRate, 0, 100, (v) => _multiRate = v),
         _numField('连发最多条数', _multiMax, 2, 5, (v) => _multiMax = v),
         _numField('连发时随机 @ 群里其他人概率 %', _chattyAtRate, 0, 100, (v) => _chattyAtRate = v),
         _numField('主动发言概率 %（收到群消息时按概率插话，5分钟每群最多1次）', _idleActiveRate, 0, 100, (v) => _idleActiveRate = v),
         const SizedBox(height: 4),
-        _section('主动开话题 · 冷场检查'),
+        ]),
+        _settingsGroup('主动开话题 · 冷场检查', [
         Padding(
           padding: const EdgeInsets.only(bottom: 8, left: 4),
           child: Text(
@@ -1278,8 +1460,7 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
             label: const Text('保存开话题设置（QQBot 自动重启生效）'),
           ),
         ),
-        _saveButton(),
-        const SizedBox(height: 24),
+        ]),
       ],
     );
   }
@@ -1287,11 +1468,11 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
   // ---------- Tab 4：语音·照片 ----------
   // ---------- Tab 5：工具（语音包上传/管理） ----------
   Widget _toolsTab() {
-    return ListView(
-      padding: const EdgeInsets.all(16),
+    return _settingsList(
+      keyName: 'tools',
       children: [
         _messageBar(),
-        _section('语音包 · MP3 音色样本'),
+        _settingsGroup('语音包 · MP3 音色样本', [
         Padding(
           padding: const EdgeInsets.only(bottom: 8, left: 4),
           child: Text(
@@ -1332,7 +1513,8 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
           ..._vpItems.map(_vpTile),
         ],
         const SizedBox(height: 12),
-        _section('克隆声音'),
+        ]),
+        _settingsGroup('克隆声音', [
         Padding(
           padding: const EdgeInsets.only(bottom: 8, left: 4),
           child: Text(
@@ -1453,7 +1635,8 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
         else
           ..._cloneItems.map(_cloneTile),
         const SizedBox(height: 12),
-        _section('AI 网上学习（让它学会聊天）'),
+        ]),
+        _settingsGroup('AI 网上学习（让它学会聊天）', [
         Padding(
           padding: const EdgeInsets.only(bottom: 8, left: 4),
           child: Text(
@@ -1563,17 +1746,17 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
                     maxLines: 1, overflow: TextOverflow.ellipsis),
               )),
         ],
-        const SizedBox(height: 24),
+        ]),
       ],
     );
   }
 
   Widget _mediaTab() {
-    return ListView(
-      padding: const EdgeInsets.all(16),
+    return _settingsList(
+      keyName: 'media',
       children: [
         _messageBar(),
-        _section('角色语音 · 音色（人设自动匹配，可手动覆盖）'),
+        _settingsGroup('角色语音 · 音色（人设自动匹配，可手动覆盖）', [
         SwitchListTile(
           value: _rtEnabled,
           onChanged: (v) => setState(() => _rtEnabled = v),
@@ -1668,7 +1851,8 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
           ),
         ],
         const SizedBox(height: 4),
-        _section('语音接口（TTS / 语音输出）'),
+        ]),
+        _settingsGroup('语音接口（TTS / 语音输出）', [
         SwitchListTile(
           value: _voiceEnabled,
           onChanged: (v) => setState(() => _voiceEnabled = v),
@@ -1719,7 +1903,8 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
           ),
         ],
         const SizedBox(height: 8),
-        _section('照片接口（视觉理解）'),
+        ]),
+        _settingsGroup('照片接口（视觉理解）', [
         SwitchListTile(
           value: _visionEnabled,
           onChanged: (v) => setState(() => _visionEnabled = v),
@@ -1769,8 +1954,7 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
             ),
           ),
         ],
-        _saveButton(),
-        const SizedBox(height: 24),
+        ]),
       ],
     );
   }
@@ -2058,5 +2242,27 @@ class _AiSettingsPageState extends State<AiSettingsPage> {
     } finally {
       if (mounted) setState(() => _fetchingModels = false);
     }
+  }
+}
+
+/// 保留各分类的滚动位置和表单状态，避免切换后重建输入。
+class _KeepAliveAiTab extends StatefulWidget {
+  const _KeepAliveAiTab({super.key, required this.child});
+
+  final Widget child;
+
+  @override
+  State<_KeepAliveAiTab> createState() => _KeepAliveAiTabState();
+}
+
+class _KeepAliveAiTabState extends State<_KeepAliveAiTab>
+    with AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true;
+
+  @override
+  Widget build(BuildContext context) {
+    super.build(context);
+    return widget.child;
   }
 }

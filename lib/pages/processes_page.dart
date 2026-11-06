@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../core/app_state.dart';
 import '../core/bridge.dart';
+import '../core/snow_theme.dart';
 import 'vnc_page.dart';
 
 /// 进程接入页 — QQ 进程列表 + 加载/卸载/刷新 + QQ 账号状态
@@ -106,10 +107,21 @@ class _ProcessesPageState extends State<ProcessesPage> {
         ],
       ),
       body: SafeArea(
-        child: ListView(
-          padding: const EdgeInsets.all(12),
-          children: [
-            _serverSpacer(context, text),
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 900),
+            child: ListView(
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+              children: [
+                const Text('CONNECTION',
+                    style: TextStyle(fontSize: 11, letterSpacing: 2,
+                        color: SnowStyle.muted, fontWeight: FontWeight.w700)),
+                const SizedBox(height: 8),
+                const Text('接入 QQ',
+                    style: TextStyle(fontSize: 34, fontWeight: FontWeight.w800,
+                        letterSpacing: -1)),
+                const SizedBox(height: 20),
+                _serverSpacer(context, text),
             const SizedBox(height: 6),
             if (_err != null)
               Padding(
@@ -128,24 +140,32 @@ class _ProcessesPageState extends State<ProcessesPage> {
                             style: text.bodyMedium
                                 ?.copyWith(color: Colors.grey.shade600)))
                     : _accountRows(context, text)),
-          ],
+              ],
+            ),
+          ),
         ),
       ),
     );
   }
 
-  Widget _serverSpacer(BuildContext context, TextTheme text) => Card(
-        elevation: 0,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(14),
-          side: BorderSide(color: Colors.grey.shade200),
-        ),
-        child: ListTile(
-          contentPadding: const EdgeInsets.symmetric(horizontal: 14),
-          leading: const Icon(Icons.dns_outlined, color: Colors.indigo),
-          title: const Text('SnowLuma 服务器'),
-          subtitle: SelectableText(appState.serverLabel,
-              style: text.bodySmall?.copyWith(color: Colors.grey.shade600)),
+  Widget _serverSpacer(BuildContext context, TextTheme text) => Container(
+        decoration: SnowStyle.card(color: SnowStyle.ink, radius: 26),
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('SNOWLUMA SERVER',
+                style: TextStyle(color: Color(0xFFB5B8C2), fontSize: 10,
+                    letterSpacing: 1.5, fontWeight: FontWeight.w700)),
+            const SizedBox(height: 14),
+            const Text('服务器地址',
+                style: TextStyle(color: Colors.white, fontSize: 19,
+                    fontWeight: FontWeight.w700)),
+            const SizedBox(height: 6),
+            SelectableText(appState.serverLabel,
+                style: const TextStyle(color: Color(0xFFC5C7CF),
+                    fontSize: 12, fontFeatures: SnowStyle.tabular)),
+          ],
         ),
       );
 
@@ -187,11 +207,8 @@ class _ProcessesPageState extends State<ProcessesPage> {
 
   Widget _sectionCard(BuildContext context, TextTheme text, String title,
           IconData icon, Widget body) =>
-      Card(
-        elevation: 0,
-        shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(14),
-            side: BorderSide(color: Colors.grey.shade200)),
+      Container(
+        decoration: SnowStyle.card(),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -215,34 +232,38 @@ class _ProcessesPageState extends State<ProcessesPage> {
   Widget _processRows(BuildContext context, TextTheme text) => Column(
         children: [
           for (final p in _processes)
-            ListTile(
-              dense: true,
-              contentPadding: const EdgeInsets.symmetric(horizontal: 14),
-              leading: Icon(
-                (p['online'] == true || p['status'] == 'online')
-                    ? Icons.check_circle
-                    : Icons.radio_button_unchecked,
-                size: 18,
-                color: (p['online'] == true || p['status'] == 'online')
-                    ? Colors.green
-                    : Colors.grey.shade400,
-              ),
-              title: Text(
-                (p['name'] ?? p['platform'] ?? p['id'] ?? 'QQ 进程').toString(),
-                style: const TextStyle(fontSize: 14),
-              ),
-              subtitle: Text(
-                'id=${p['id'] ?? p['pid'] ?? '-'} · ${p['status'] ?? p['state'] ?? 'idle'}',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: text.bodySmall?.copyWith(color: Colors.grey.shade600),
-              ),
-              trailing: Wrap(
-                spacing: 2,
+            Padding(
+              padding: const EdgeInsets.fromLTRB(14, 10, 14, 8),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _opBtn('载入', () => _act(p, 'load')),
-                  _opBtn('刷新', () => _act(p, 'refresh')),
-                  _opBtn('卸载', () => _act(p, 'unload')),
+                  Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Icon(
+                      (p['online'] == true || p['status'] == 'online')
+                          ? Icons.check_circle : Icons.radio_button_unchecked,
+                      size: 18,
+                      color: (p['online'] == true || p['status'] == 'online')
+                          ? Colors.green : Colors.grey.shade400,
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text((p['name'] ?? p['platform'] ?? p['id'] ?? 'QQ 进程').toString(),
+                            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+                        const SizedBox(height: 4),
+                        Text('id=${p['id'] ?? p['pid'] ?? '-'} · ${p['status'] ?? p['state'] ?? 'idle'}',
+                            style: text.bodySmall?.copyWith(
+                                color: SnowStyle.muted, fontFeatures: SnowStyle.tabular)),
+                      ],
+                    )),
+                  ]),
+                  const SizedBox(height: 4),
+                  Wrap(spacing: 4, children: [
+                    _opBtn('载入', () => _act(p, 'load')),
+                    _opBtn('刷新', () => _act(p, 'refresh')),
+                    _opBtn('卸载', () => _act(p, 'unload')),
+                  ]),
                 ],
               ),
             ),

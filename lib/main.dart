@@ -4,6 +4,7 @@ import 'package:path_provider/path_provider.dart';
 
 import 'core/app_state.dart';
 import 'core/bridge.dart';
+import 'core/snow_theme.dart';
 import 'pages/actions_page.dart';
 import 'pages/home_page.dart';
 import 'pages/login_page.dart';
@@ -28,16 +29,7 @@ class SnowLumaApp extends StatelessWidget {
       child: MaterialApp(
         title: 'SnowLuma',
         debugShowCheckedModeBanner: false,
-        theme: ThemeData(
-          useMaterial3: true,
-          colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF3949AB)),
-          scaffoldBackgroundColor: const Color(0xFFF5F5F7),
-          appBarTheme: const AppBarTheme(backgroundColor: Colors.white, elevation: 0),
-          inputDecorationTheme: const InputDecorationTheme(
-            isDense: true,
-            border: OutlineInputBorder(),
-          ),
-        ),
+        theme: SnowStyle.light(),
         routes: {
           '/': (context) => const RootView(),
           '/actions': (context) => const ActionsPage(),

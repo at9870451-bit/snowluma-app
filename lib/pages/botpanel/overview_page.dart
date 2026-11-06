@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/app_state.dart';
 import '../../core/qqbot_client.dart';
+import '../../core/snow_theme.dart';
 import 'q_ui.dart';
 
 /// QQBot 总览 — 运行状态 / 插件概览 / 关键统计 / 最近日志
@@ -108,12 +109,34 @@ class _QqbotOverviewPageState extends State<QqbotOverviewPage> {
         return RefreshIndicator(
           onRefresh: () => _load(),
           child: ListView(
-            padding: const EdgeInsets.fromLTRB(14, 10, 14, 120),
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: EdgeInsets.fromLTRB(
+                20, 12, 20, MediaQuery.of(context).padding.bottom + 32),
             children: [
-              _statusCard(),
-              _statCard(),
-              _pluginCard(),
-              _recentLogCard(),
+              Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 1040),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      const Text('OVERVIEW',
+                          style: TextStyle(fontSize: 11, letterSpacing: 2,
+                              color: SnowStyle.muted, fontWeight: FontWeight.w700)),
+                      const SizedBox(height: 8),
+                      const Text('运行概览',
+                          style: TextStyle(fontSize: 34, fontWeight: FontWeight.w800,
+                              letterSpacing: -1)),
+                      const SizedBox(height: 20),
+                      _statusCard(),
+                      const SectionLabel('关键数据'),
+                      _statCard(),
+                      const SectionLabel('服务详情'),
+                      _pluginCard(),
+                      _recentLogCard(),
+                    ],
+                  ),
+                ),
+              ),
             ],
           ),
         );
@@ -127,75 +150,50 @@ class _QqbotOverviewPageState extends State<QqbotOverviewPage> {
     final ok = running && connected;
     final uptime = (_status['uptime'] as num?) ?? 0;
     final selfId = _status['self_id'];
-    return QCard(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
+    final details = [
+      if (selfId != null && '$selfId' != '0') 'QQ $selfId',
+      '版本 ${_status['version'] ?? '-'}',
+      if (_status['backend'] != null) '${_status['backend']}',
+    ].join(' · ');
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(22),
+      decoration: SnowStyle.card(color: SnowStyle.ink, radius: 26),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          Container(width: 9, height: 9, decoration: BoxDecoration(
+            color: ok ? const Color(0xFF9BD1B1) : const Color(0xFFB9A795),
+            shape: BoxShape.circle)),
+          const SizedBox(width: 8),
+          const Expanded(child: Text('SERVER STATUS',
+              style: TextStyle(color: Color(0xFFB5B8C2), fontSize: 10,
+                  letterSpacing: 1.5, fontWeight: FontWeight.w700))),
+        ]),
+        const SizedBox(height: 18),
+        Text(ok ? '运行中 · 已连接 QQ' : (running ? '运行中 · QQ 未连接' : '未运行'),
+            style: const TextStyle(color: Colors.white, fontSize: 21,
+                fontWeight: FontWeight.w800, height: 1.25)),
+        const SizedBox(height: 8),
+        Text(details, style: const TextStyle(color: Color(0xFFC5C7CF),
+            fontSize: 12, height: 1.5, fontFeatures: SnowStyle.tabular)),
+        const SizedBox(height: 20),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          decoration: BoxDecoration(color: const Color(0xFF303137),
+              borderRadius: BorderRadius.circular(14)),
+          child: Wrap(
+            spacing: 14, runSpacing: 6, alignment: WrapAlignment.spaceBetween,
             children: [
-              Container(
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(
-                  color: (ok ? const Color(0xFF34C759) : const Color(0xFFFF9500))
-                      .withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Icon(
-                  ok ? Icons.check_circle_rounded : Icons.warning_amber_rounded,
-                  color: ok ? const Color(0xFF34C759) : const Color(0xFFFF9500),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      ok
-                          ? '运行中 · 已连接 QQ'
-                          : (running ? '运行中 · QQ 未连接' : '未运行'),
-                      style: const TextStyle(
-                          fontSize: 16, fontWeight: FontWeight.w700),
-                    ),
-                    const SizedBox(height: 3),
-                    Text(
-                      [
-                        if (selfId != null && '$selfId' != '0') 'QQ ${selfId}',
-                        '版本 ${_status['version'] ?? '-'}',
-                        if (_status['backend'] != null) '${_status['backend']}',
-                      ].join(' · '),
-                      style: TextStyle(
-                          fontSize: 12, color: Colors.grey.shade600),
-                    ),
-                  ],
-                ),
-              ),
+              Text('已运行 ${fmtDuration(uptime)}',
+                  style: const TextStyle(color: Colors.white, fontSize: 12,
+                      fontFeatures: SnowStyle.tabular)),
+              const Text('每 10 秒自动刷新',
+                  style: TextStyle(color: Color(0xFFB5B8C2), fontSize: 11)),
             ],
           ),
-          const SizedBox(height: 14),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-            decoration: BoxDecoration(
-              color: const Color(0xFFF7F7FA),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Row(
-              children: [
-                const Icon(Icons.timer_outlined, size: 16, color: kIosBlue),
-                const SizedBox(width: 8),
-                Text('已运行 ${fmtDuration(uptime)}',
-                    style: const TextStyle(fontSize: 13)),
-                const Spacer(),
-                Text('每 10 秒自动刷新',
-                    style:
-                        TextStyle(fontSize: 11, color: Colors.grey.shade500)),
-              ],
-            ),
-          ),
-        ],
-      ),
+        ),
+      ]),
     );
   }
 
@@ -205,31 +203,39 @@ class _QqbotOverviewPageState extends State<QqbotOverviewPage> {
     final kbTerms = (_kbStats['terms'] as num?) ?? 0;
     final memTotal = (_memStats['total'] as num?) ?? 0;
     final memEnabled = (_memStats['enabled'] as num?) ?? 0;
-    return QCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          StatRow(items: [
-            StatTile(value: '$pluginCount', label: '插件'),
-            StatTile(value: '$memTotal', label: '记忆（启用 $memEnabled）'),
-            StatTile(value: '$kbDocs', label: '知识库文档'),
+    return LayoutBuilder(builder: (context, constraints) {
+      const gap = 12.0;
+      final cols = constraints.maxWidth >= 620 ? 3 :
+          (constraints.maxWidth < 300 ? 1 : 2);
+      final w = (constraints.maxWidth - gap * (cols - 1)) / cols;
+      Widget tile(String label, String value, String note, Color fill) => SizedBox(
+        width: w,
+        child: Container(
+          constraints: const BoxConstraints(minHeight: 126),
+          padding: const EdgeInsets.all(16),
+          decoration: SnowStyle.card(color: fill),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(label, style: const TextStyle(color: SnowStyle.muted,
+                fontSize: 12, fontWeight: FontWeight.w600)),
+            const SizedBox(height: 10),
+            Text(value, style: const TextStyle(fontSize: 29, height: 1,
+                fontWeight: FontWeight.w800, fontFeatures: SnowStyle.tabular)),
+            const SizedBox(height: 9),
+            Text(note, style: const TextStyle(color: SnowStyle.muted,
+                fontSize: 11, height: 1.3)),
           ]),
-          const SizedBox(height: 12),
-          Divider(height: 1, color: Colors.grey.shade200),
-          const SizedBox(height: 10),
-          Row(
-            children: [
-              Icon(Icons.menu_book_outlined,
-                  size: 15, color: Colors.grey.shade500),
-              const SizedBox(width: 6),
-              Text('知识条目 $kbTerms 条 · 记忆按群/用户自动隔离',
-                  style:
-                      TextStyle(fontSize: 11.5, color: Colors.grey.shade600)),
-            ],
-          ),
-        ],
-      ),
-    );
+        ),
+      );
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 8),
+        child: Wrap(spacing: gap, runSpacing: gap, children: [
+          tile('插件', '$pluginCount', '已加载', SnowStyle.surface),
+          tile('记忆', '$memTotal', '启用 $memEnabled', const Color(0xFFEEEFF5)),
+          tile('知识库文档', '$kbDocs', '知识条目 $kbTerms 条 · 按群隔离',
+              const Color(0xFFF0F1ED)),
+        ]),
+      );
+    });
   }
 
   Widget _pluginCard() {
