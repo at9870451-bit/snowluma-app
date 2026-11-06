@@ -91,8 +91,8 @@ abstract final class SnowStyle {
         selectionHandleColor: accent,
       ),
       pageTransitionsTheme: const PageTransitionsTheme(builders: {
-        TargetPlatform.iOS: CupertinoPageTransitionsBuilder(),
-        TargetPlatform.macOS: CupertinoPageTransitionsBuilder(),
+        TargetPlatform.iOS: ZoomPageTransitionsBuilder(),
+        TargetPlatform.macOS: ZoomPageTransitionsBuilder(),
       }),
     );
   }

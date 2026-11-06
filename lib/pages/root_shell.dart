@@ -638,7 +638,7 @@ class _FilterButton extends StatelessWidget {
             child: Container(
               width: 8,
               height: 8,
-              decoration: const BoxDecoration(
+              decoration: BoxDecoration(
                   color: style_core.SnowStyle.accent, shape: BoxShape.circle),
             ),
           ),
