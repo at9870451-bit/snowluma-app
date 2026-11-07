@@ -132,17 +132,31 @@ class _LocalPageState extends State<LocalPage> {
                 _section('环境组件'),
                 _componentsCard(),
                 const SizedBox(height: 16),
-                _section('本地部署机器人'),
+                _section('局域网部署（离线包）'),
                 _copyCard(
-                  'SnowLuma + QQBot 部署向导',
-                  '1. 安装 QQBot 服务并设为开机自启\n'
-                  '2. 启动 SnowLuma 容器（自带 NapCat/OneBot）\n'
-                  '3. 面板连服务器后，在「AI」页配置模型\n'
-                  '4. 在「插件管理 → 🛍 插件市场」安装需要的能力',
-                  code: 'systemctl enable --now qqbot\n'
-                      'docker start snowluma\n'
-                      'cd /opt/qqbot && systemctl restart qqbot',
+                  '① 下载离线包',
+                  '在局域网设备（树莓派/NUC/家用服务器）的浏览器打开下面的地址，'
+                  '或在电脑上下载后拷到目标设备：',
+                  code: 'http://$_host:6199/static/snowluma-qqbot-offline.tar.gz',
                 ),
+                _copyCard(
+                  '② 解压并安装',
+                  '把离线包拷到目标设备，解压后执行安装脚本（会自动装 Docker、QQBot、'
+                  'systemd 服务和沙盒目录）：',
+                  code: 'tar -xzf snowluma-qqbot-offline.tar.gz\n'
+                      'cd offline && sudo bash install.sh',
+                ),
+                _copyCard(
+                  '③ App 连接局域网',
+                  '安装完成后脚本会打印局域网 IP，在 App「接入」页填写面板地址，'
+                  '即可连接本地机器人：',
+                  code: 'http://<局域网IP>:6199',
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                    '要求：目标设备为 Debian/Ubuntu 系 Linux，可访问 Docker Hub；'
+                    '完全离线环境请先 docker save/load SnowLuma 镜像。',
+                    style: TextStyle(fontSize: 11, color: SnowStyle.muted, height: 1.5)),
                 const SizedBox(height: 8),
                 const Text('提示：以上命令在服务器终端执行；本页只负责本地引导与复制。',
                     style: TextStyle(fontSize: 11, color: SnowStyle.muted)),
