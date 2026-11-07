@@ -5,11 +5,13 @@
 #include <string.h>
 #include <sys/stat.h>
 
-#include "xX_main_Xx.h"
-#include "kernel/init.h"
-#include "kernel/fs.h"
+// 必须先包含这些内核头文件，xX_main_Xx.h 才能解析 current/task/exit_hook/do_execve
+#include "kernel/calls.h"
 #include "kernel/task.h"
 #include "kernel/errno.h"
+#include "kernel/fs.h"
+#include "kernel/init.h"
+#include "xX_main_Xx.h"
 
 // 启动一个 Linux 会话：
 //   rootfs: 已包含 Alpine 目录的路径（fakefs 会挂载 rootfs/data）
