@@ -47,6 +47,12 @@ jobs:
       - name: 编译 libish（真机 arm64 静态库）
         run: |
           cd native/ish
+          # 让 meson 使用 LLVM 的 clang（支持 -fuse-ld=lld 且能找到 ld.lld）
+          export PATH="/usr/local/opt/llvm/bin:$PATH"
+          export CC=/usr/local/opt/llvm/bin/clang
+          export CXX=/usr/local/opt/llvm/bin/clang++
+          which clang && clang --version | head -1
+          ls -l /usr/local/opt/llvm/bin/ld.lld /usr/local/opt/llvm/bin/lld 2>/dev/null || true
           set -o pipefail
           xcodebuild -project iSH.xcodeproj \
             -target libish \
