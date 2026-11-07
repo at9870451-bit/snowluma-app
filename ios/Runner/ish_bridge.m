@@ -17,6 +17,12 @@
 extern int ish_bridge_start_fds(const char *rootfs, const char *exe,
                                 const char *envp, int stdin_fd, int stdout_fd);
 
+@interface ISHBridge ()
+@property(nonatomic) int inputWriteFd;
+@property(nonatomic) int outputReadFd;
+@property(nonatomic, copy) void (^outputCallback)(NSString *);
+@end
+
 typedef struct {
     char *rootfs;
     char *exe;
@@ -52,12 +58,6 @@ static void *output_reader_thread(void *arg) {
     }
     return NULL;
 }
-
-@interface ISHBridge ()
-@property(nonatomic) int inputWriteFd;
-@property(nonatomic) int outputReadFd;
-@property(nonatomic, copy) void (^outputCallback)(NSString *);
-@end
 
 @implementation ISHBridge
 
