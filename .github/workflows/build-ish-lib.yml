@@ -89,19 +89,7 @@ jobs:
 
         xcodebuild -project iSH.xcodeproj -list 2>&1 | head -50'
     - name: 编译 libish（真机 arm64 静态库）
-      run: 'cd native/ish
-
-        export PATH="/usr/local/opt/llvm/bin:$PATH"
-
-        export CC=/usr/local/opt/llvm/bin/clang
-
-        export CXX=/usr/local/opt/llvm/bin/clang++
-
-        which clang && clang --version | head -1
-
-        set -o pipefail
-
-        xcodebuild -project iSH.xcodeproj -target libish -configuration Release -sdk iphoneos CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO build 2>&1 | tail -60'
+      run: "cd native/ish\nexport PATH=\"/usr/local/opt/llvm/bin:$PATH\"\nexport CC=/usr/local/opt/llvm/bin/clang\nexport CXX=/usr/local/opt/llvm/bin/clang++\nwhich clang && clang --version | head -1\nset -o pipefail\nfor t in libish libish_emu libfakefs libiSHApp; do\n  echo \"=== target $t ===\"\n  xcodebuild -project iSH.xcodeproj -target \"$t\" -configuration Release -sdk iphoneos \\\n    CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO build 2>&1 | tail -15\ndone"
     - name: 收集 .a 产物
       run: 'mkdir -p build/ish-libs
 
