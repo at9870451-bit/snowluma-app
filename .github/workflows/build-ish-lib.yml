@@ -31,9 +31,7 @@ jobs:
 
       - name: 安装构建工具（meson / ninja）
         run: |
-          pip3 install -q meson ninja 2>&1 | tail -2
-          export PATH="$PATH:$HOME/.local/bin"
-          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          brew install meson ninja 2>&1 | tail -3
           meson --version
           ninja --version
 
