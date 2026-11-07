@@ -29,6 +29,14 @@ jobs:
           echo "=== iSH 顶层 ==="
           ls native/ish | head -20
 
+      - name: 安装构建工具（meson / ninja）
+        run: |
+          pip3 install -q meson ninja 2>&1 | tail -2
+          export PATH="$PATH:$HOME/.local/bin"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          meson --version
+          ninja --version
+
       - name: 列出 Xcode targets
         run: |
           cd native/ish
