@@ -7,6 +7,7 @@ import '../core/snow_theme.dart';
 import 'actions_page.dart';
 import 'ai_settings_page.dart';
 import 'home_page.dart';
+import 'local_page.dart';
 import 'logs_page.dart';
 import 'processes_page.dart';
 import 'vnc_page.dart';
@@ -22,7 +23,7 @@ const _softShadows = <BoxShadow>[
   BoxShadow(color: Color(0x0D0E1726), blurRadius: 26, offset: Offset(0, 12)),
 ];
 
-/// Four persistent destinations. The IndexedStack intentionally keeps each
+/// Five persistent destinations. The IndexedStack intentionally keeps each
 /// tab's state and lifecycle unchanged when another tab is selected.
 class RootShell extends StatefulWidget {
   const RootShell({super.key});
@@ -38,6 +39,8 @@ class _RootShellState extends State<RootShell> {
     _TabSpec(Icons.person_outline_rounded, Icons.person_rounded, '账号'),
     _TabSpec(Icons.qr_code_scanner_rounded, Icons.qr_code_scanner_rounded, '接入'),
     _TabSpec(Icons.auto_awesome_outlined, Icons.auto_awesome, 'AI'),
+    _TabSpec(Icons.home_repair_service_outlined,
+        Icons.home_repair_service_rounded, '本地部署'),
     _TabSpec(Icons.tune_rounded, Icons.tune_rounded, '工具'),
   ];
 
@@ -61,7 +64,8 @@ class _RootShellState extends State<RootShell> {
           const HomePage(),
           const ProcessesPage(),
           const AiSettingsPage(),
-          _ToolsTab(isActive: _index == 3),
+          const LocalPage(),
+          _ToolsTab(isActive: _index == 4),
         ],
       ),
       bottomNavigationBar: keyboardOpen
