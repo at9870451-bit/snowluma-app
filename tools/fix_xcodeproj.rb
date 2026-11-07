@@ -7,8 +7,8 @@ project = Xcodeproj::Project.open(project_path)
 
 lib_flags = '$(inherited) -force_load "$(SRCROOT)/../native/libs/ios/libsnowluma_core.a"'
 
-# iSH（内嵌 Linux 沙盒）静态库：libish 内核 + emu 模拟器 + fakefs + App 层桥接
-ish_libs = %w[libish.a libish_emu.a libfakefs.a libiSHApp.a]
+# iSH（内嵌 Linux 沙盒）静态库：先只链接纯 C 内核（libiSHApp 依赖 iOS App 专用符号，桥接另行处理）
+ish_libs = %w[libish.a libish_emu.a libfakefs.a]
 ish_flags = ish_libs.map { |l| "-force_load \"$(SRCROOT)/../native/libs/ios/#{l}\"" }.join(' ')
 lib_flags = "#{lib_flags} #{ish_flags}"
 
