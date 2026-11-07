@@ -81,7 +81,8 @@ class _IshSandboxPageState extends State<IshSandboxPage> {
           target.parent.createSync(recursive: true);
           target.writeAsBytesSync(file.content as List<int>);
           n++;
-        } else if (file.isDirectory) {
+        } else {
+          // ArchiveFile 无 isDirectory；非文件项即目录（name 以 / 结尾）
           Directory(target.path).createSync(recursive: true);
         }
       }
