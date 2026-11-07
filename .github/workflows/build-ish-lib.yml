@@ -1,0 +1,68 @@
+# 路线 B 第一阶段：把 iSH 内核编译成 iOS 静态库（libish.a 系列）
+# 目标：验证在 GitHub Actions macOS runner 上能产出可嵌入 Flutter 的 .a
+# 说明：iSH 源码在每次构建时从上游 clone（GPLv2 合规：源码指向上游仓库）
+name: Build iSH iOS Static Libraries
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/build-ish-lib.yml'
+      - 'native/ish/**'
+
+permissions:
+  contents: write
+
+jobs:
+  build-ish:
+    name: libish.a (iOS device)
+    runs-on: macos-15-intel
+    timeout-minutes: 60
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Clone iSH (with submodules)
+        run: |
+          git clone --depth 1 --recurse-submodules \
+            https://github.com/ish-app/ish native/ish
+          echo "=== iSH 顶层 ==="
+          ls native/ish | head -20
+
+      - name: 列出 Xcode targets
+        run: |
+          cd native/ish
+          xcodebuild -project iSH.xcodeproj -list 2>&1 | head -50
+
+      - name: 编译 libish（真机 arm64 静态库）
+        run: |
+          cd native/ish
+          set -o pipefail
+          xcodebuild -project iSH.xcodeproj \
+            -target libish \
+            -configuration Release \
+            -sdk iphoneos \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            build 2>&1 | tail -60
+
+      - name: 收集 .a 产物
+        run: |
+          mkdir -p build/ish-libs
+          find native/ish -name "*.a" 2>/dev/null | while read f; do
+            echo "找到: $f"
+            cp "$f" build/ish-libs/
+          done
+          find "$HOME/Library/Developer/Xcode/DerivedData" -name "*.a" 2>/dev/null | head -10 | while read f; do
+            echo "DerivedData: $f"
+            cp "$f" build/ish-libs/ 2>/dev/null || true
+          done
+          echo "=== 产物清单 ==="
+          ls -la build/ish-libs/ 2>/dev/null || echo "（无 .a 产物，需调试构建）"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ish-ios-libs
+          path: build/ish-libs/
+          retention-days: 30
+          if-no-files-found: ignore
