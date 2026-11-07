@@ -11,7 +11,7 @@ class IshOutputHandler: NSObject, FlutterStreamHandler {
     }
 
     func onCancel(withArguments arguments: Any?) -> FlutterError? {
-        ISHBridge.setOutputCallback(nil)
+        ISHBridge.setOutputCallback { _ in }
         return nil
     }
 }
