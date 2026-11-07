@@ -53,9 +53,9 @@ jobs:
 
         s = s.replace(old_clang, new_clang, 1)
 
-        old_vdso = "vdso_compiler = [clang, ''-target'', ''i386-linux'', ''-fuse-ld=lld'']"
+        old_vdso = "vdso_compiler = [clang, ''-target'', ''x86-linux'', ''-fuse-ld=lld'']"
 
-        new_vdso = "vdso_compiler = [clang, ''-target'', ''i386-linux'']"
+        new_vdso = "vdso_compiler = [clang, ''-target'', ''x86-linux'']"
 
         assert old_vdso in s, ''vdso_compiler 未匹配''
 
