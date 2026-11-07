@@ -6,6 +6,7 @@ import 'package:path_provider/path_provider.dart';
 
 import '../core/app_state.dart';
 import '../core/snow_theme.dart';
+import 'ish_sandbox_page.dart';
 
 /// 本地部署 — 纯本地页面，不依赖服务器新增接口。
 ///
@@ -190,6 +191,12 @@ class _LocalPageState extends State<LocalPage> {
                     '但 NapCat（QQ 协议端）无法在 iSH 运行，QQ 消息收发需另配协议端；'
                     'iOS 会挂起长时间后台的 iSH，需要保持前台。',
                     style: TextStyle(fontSize: 11, color: SnowStyle.muted, height: 1.5)),
+                const SizedBox(height: 10),
+                FilledButton.icon(
+                  onPressed: () => openIshSandbox(context),
+                  icon: const Icon(Icons.terminal_rounded, size: 18),
+                  label: const Text('启动 App 内 iSH 沙盒'),
+                ),
                 const SizedBox(height: 16),
                 _section('局域网部署（离线包）'),
                 _exportCard(),

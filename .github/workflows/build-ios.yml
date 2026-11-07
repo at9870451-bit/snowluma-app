@@ -66,6 +66,12 @@ jobs:
           echo "=== 静态库 ==="; ls -lh native/libs/ios/
           nm -gU native/libs/ios/libsnowluma_core.a 2>/dev/null | grep -E 'snowluma_(call|free)' || echo "nm 跳过：Xcode nm 无法读取新版 LLVM 产物"
 
+      - name: Clone iSH 源码（桥接头文件）
+        run: |
+          git clone --depth 1 --recurse-submodules \
+            https://github.com/ish-app/ish native/ish
+          ls -l native/ish/xX_main_Xx.h native/ish/vdso/meson.build
+
       - name: Runner 工程注入链接设置（force_load + 禁 strip，保 FFI 符号）
         run: |
           ruby tools/fix_xcodeproj.rb
