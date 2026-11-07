@@ -1,6 +1,6 @@
 # 路线 B 第一阶段：把 iSH 内核编译成 iOS 静态库（libish.a 系列）
 # 目标：验证在 GitHub Actions macOS runner 上能产出可嵌入 Flutter 的 .a
-# 说明：iSH 源码在每次构建时从上游 clone（GPLv2 合规：源码指向上游仓库）
+# VDSO：用 Zig（自带 ELF lld）替代 llvm clang，patch iSH 源码指向 zigcc
 name: Build iSH iOS Static Libraries
 
 on:
@@ -37,17 +37,12 @@ jobs:
           ninja --version
           zig version
 
-      - name: Patch iSH 使用 Zig 编译 VDSO（自带 ELF lld）
+      - name: Patch iSH 使用 Zig 编译 VDSO
         run: |
           cd native/ish
-          # 创建 zig cc 包装器（clang 兼容接口）
-          cat > /usr/local/bin/zigcc <<'EOF'
-#!/bin/sh
-exec /usr/local/bin/zig cc "$@"
-EOF
+          printf '#!/bin/sh\nexec /usr/local/bin/zig cc "$@"\n' > /usr/local/bin/zigcc
           chmod +x /usr/local/bin/zigcc
           echo "zigcc 已创建"
-          # 把 vdso 编译器从 llvm clang 换成 zigcc，并去掉 -fuse-ld（zig cc 内置 lld）
           python3 - <<'PY'
 from pathlib import Path
 p = Path('vdso/meson.build')
@@ -80,12 +75,10 @@ PY
       - name: 编译 libish（真机 arm64 静态库）
         run: |
           cd native/ish
-          # 使用 LLVM clang（支持 -fuse-ld=lld），ld.lld 已在 /usr/local/bin
           export PATH="/usr/local/opt/llvm/bin:$PATH"
           export CC=/usr/local/opt/llvm/bin/clang
           export CXX=/usr/local/opt/llvm/bin/clang++
           which clang && clang --version | head -1
-          which ld.lld && ld.lld --version | head -1
           set -o pipefail
           xcodebuild -project iSH.xcodeproj \
             -target libish \
