@@ -1,14 +1,17 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../core/app_state.dart';
 import '../core/snow_theme.dart';
 
-/// 本地部署 — 查看服务器连接、面板/网关地址与本地模型说明。
+/// 本地部署 — 纯本地页面，不依赖服务器新增接口。
 ///
-/// 数据来源：
-///   appState.baseUrl / serverLabel：当前服务器地址
-///   GET /api/status（若已连接）：服务器在线状态
-///   本地模型（Ollama）为服务器侧能力，App 内仅在 AI 设置中可切换。
+/// 内容：
+///   1. 部署状态（复用已有 /api/status 连接检测，仅检测当前服务器连通）
+///   2. Rootfs 管理：本地部署目标目录结构说明
+///   3. 沙盒创建：一键复制服务器命令
+///   4. 环境组件：BusyBox / musl / Python / Node.js / OpenSSL / Git 清单
+///   5. SnowLuma + QQBot 本地部署向导（命令可复制）
 class LocalPage extends StatefulWidget {
   const LocalPage({super.key});
 
@@ -60,7 +63,14 @@ class _LocalPageState extends State<LocalPage> {
 
   String get _host {
     final u = Uri.tryParse(appState.baseUrl);
-    return (u != null && u.host.isNotEmpty) ? u.host : 'localhost';
+    return (u != null && u.host.isNotEmpty) ? u.host : '服务器IP';
+  }
+
+  void _copy(String text) {
+    Clipboard.setData(ClipboardData(text: text));
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(const SnackBar(content: Text('已复制到剪贴板')));
   }
 
   @override
@@ -81,53 +91,61 @@ class _LocalPageState extends State<LocalPage> {
                     style: TextStyle(fontSize: 11, letterSpacing: 2,
                         color: SnowStyle.muted, fontWeight: FontWeight.w700)),
                 const SizedBox(height: 8),
-                const Text('本地部署',
+                const Text('本地部署工坊',
                     style: TextStyle(fontSize: 32, fontWeight: FontWeight.w800,
                         letterSpacing: -0.8)),
+                const SizedBox(height: 6),
+                const Text('在服务器或沙盒里搭建 SnowLuma + QQBot，全部命令可复制。',
+                    style: TextStyle(color: SnowStyle.muted, fontSize: 13, height: 1.5)),
                 const SizedBox(height: 18),
                 _statusBanner(running, connected),
                 const SizedBox(height: 16),
                 _section('连接信息'),
-                _row('服务器地址', appState.baseUrl.isEmpty ? '未连接' : appState.baseUrl,
-                    mono: true),
-                _row('控制面板', 'http://$_host:6199', mono: true),
-                _row('AI 网关', 'http://$_host:8090', mono: true),
-                _row('QQ 接入', 'ws://$_host:3001', mono: true),
-                const SizedBox(height: 18),
-                _section('本地模型（Ollama）'),
-                _card(
-                  '本地模型说明',
-                  '服务器可选用 Ollama 本地模型（qwen2.5:0.5b）作为兜底，'
-                  '不消耗外部 API 额度，1~2 秒返回。',
+                _row('服务器地址', appState.baseUrl.isEmpty ? '未连接' : appState.baseUrl),
+                _row('控制面板', 'http://$_host:6199'),
+                _row('AI 网关', 'http://$_host:8090'),
+                const SizedBox(height: 16),
+                _section('Rootfs 管理'),
+                _copyCard(
+                  '目标 Rootfs 结构',
+                  '本地部署机器人的标准目录布局：\n'
+                  '/opt/qqbot          # QQBot 服务（主程序+配置+数据）\n'
+                  '/opt/sandbox       # 沙盒 rootfs（环境组件）\n'
+                  '  ├─ bin/          # busybox 软链\n'
+                  '  ├─ usr/bin/      # python3 / node / openssl\n'
+                  '  ├─ etc/          # 配置文件\n'
+                  '  ├─ opt/          # 应用\n'
+                  '  └─ tmp/          # 临时文件',
+                  code: 'mkdir -p /opt/sandbox/{bin,usr/bin,etc,opt,root,tmp,home}',
                 ),
-                _card(
-                  '切换位置',
-                  '在底部导航「AI」→ 模型来源中，打开「服务器本地模型」开关即可启用。',
+                const SizedBox(height: 16),
+                _section('沙盒添加'),
+                _copyCard(
+                  '创建沙盒 rootfs',
+                  '在服务器上新建一个沙盒目录并安装核心组件。',
+                  code: 'mkdir -p /opt/sandbox && cd /opt/sandbox\n'
+                      'ln -s /usr/bin/python3 usr/bin/python3\n'
+                      'ln -s /usr/bin/openssl usr/bin/openssl\n'
+                      'ln -s /usr/bin/git usr/bin/git',
                 ),
-                const SizedBox(height: 18),
-                _section('部署检查'),
-                _card(
-                  '在线状态',
-                  _checking
-                      ? '检查中…'
-                      : (_err != null
-                          ? '服务器不可达：$_err'
-                          : (running && connected
-                              ? '运行中 · QQ 已连接'
-                              : (running ? '运行中 · QQ 未连接' : '未运行'))),
-                  leading: Icon(
-                    running && connected
-                        ? Icons.check_circle_rounded
-                        : Icons.info_outline_rounded,
-                    color: running && connected
-                        ? const Color(0xFF34C759)
-                        : SnowStyle.muted,
-                  ),
-                  trailing: TextButton(
-                    onPressed: _checking ? null : _check,
-                    child: const Text('重新检测'),
-                  ),
+                const SizedBox(height: 16),
+                _section('环境组件'),
+                _componentsCard(),
+                const SizedBox(height: 16),
+                _section('本地部署机器人'),
+                _copyCard(
+                  'SnowLuma + QQBot 部署向导',
+                  '1. 安装 QQBot 服务并设为开机自启\n'
+                  '2. 启动 SnowLuma 容器（自带 NapCat/OneBot）\n'
+                  '3. 面板连服务器后，在「AI」页配置模型\n'
+                  '4. 在「插件管理 → 🛍 插件市场」安装需要的能力',
+                  code: 'systemctl enable --now qqbot\n'
+                      'docker start snowluma\n'
+                      'cd /opt/qqbot && systemctl restart qqbot',
                 ),
+                const SizedBox(height: 8),
+                const Text('提示：以上命令在服务器终端执行；本页只负责本地引导与复制。',
+                    style: TextStyle(fontSize: 11, color: SnowStyle.muted)),
               ],
             ),
           ),
@@ -145,25 +163,17 @@ class _LocalPageState extends State<LocalPage> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(children: [
-            Container(
-              width: 9,
-              height: 9,
-              decoration: BoxDecoration(
-                color: ok ? const Color(0xFF9BD1B1) : const Color(0xFFB9A795),
-                shape: BoxShape.circle,
-              ),
-            ),
+            Container(width: 9, height: 9, decoration: BoxDecoration(
+              color: ok ? const Color(0xFF9BD1B1) : const Color(0xFFB9A795),
+              shape: BoxShape.circle)),
             const SizedBox(width: 8),
-            const Expanded(
-              child: Text('SERVER STATUS',
-                  style: TextStyle(color: Color(0xFFB5B8C2), fontSize: 10,
-                      letterSpacing: 1.4, fontWeight: FontWeight.w700)),
-            ),
+            const Expanded(child: Text('SERVER STATUS',
+                style: TextStyle(color: Color(0xFFB5B8C2), fontSize: 10,
+                    letterSpacing: 1.4, fontWeight: FontWeight.w700))),
           ]),
           const SizedBox(height: 14),
           const Text('部署状态',
-              style: TextStyle(color: Colors.white, fontSize: 21,
-                  fontWeight: FontWeight.w800)),
+              style: TextStyle(color: Colors.white, fontSize: 21, fontWeight: FontWeight.w800)),
           const SizedBox(height: 6),
           Text(
             _checking
@@ -185,15 +195,14 @@ class _LocalPageState extends State<LocalPage> {
                 letterSpacing: 1, color: SnowStyle.muted)),
       );
 
-  Widget _card(String title, String desc,
-      {Widget? leading, Widget? trailing}) {
+  Widget _copyCard(String title, String desc, {required String code}) {
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(16, 14, 10, 14),
       decoration: SnowStyle.card(),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          if (leading != null) ...[leading!, const SizedBox(width: 10)],
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -202,18 +211,88 @@ class _LocalPageState extends State<LocalPage> {
                     style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
                 const SizedBox(height: 4),
                 Text(desc,
-                    style: const TextStyle(fontSize: 12.5, color: SnowStyle.muted,
-                        height: 1.45)),
+                    style: const TextStyle(fontSize: 12, color: SnowStyle.muted,
+                        height: 1.5)),
+                const SizedBox(height: 8),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF1F2F5),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: SelectableText(code,
+                      style: const TextStyle(
+                          fontFamily: 'Menlo', fontSize: 11, height: 1.5)),
+                ),
               ],
             ),
           ),
-          if (trailing != null) trailing!,
+          IconButton(
+            tooltip: '复制命令',
+            onPressed: () => _copy(code),
+            icon: const Icon(Icons.copy_rounded, size: 18),
+          ),
         ],
       ),
     );
   }
 
-  Widget _row(String label, String value, {bool mono = false}) {
+  Widget _componentsCard() {
+    const comps = [
+      ('BusyBox', '通用 Unix 工具箱（sh/ls/cp/df…）', '沙盒 bin/ 软链'),
+      ('musl', '轻量 C 库（Alpine 基础）', '随 busybox 静态二进制'),
+      ('Python', 'QQBot/插件运行环境', 'usr/bin/python3'),
+      ('Node.js', 'NapCat/SnowLuma 网关', 'usr/bin/node'),
+      ('OpenSSL', 'HTTPS/证书工具', 'usr/bin/openssl'),
+      ('Git', '版本管理与插件源', 'usr/bin/git'),
+    ];
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(16),
+      decoration: SnowStyle.card(),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          for (final c in comps)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 7),
+              child: Row(
+                children: [
+                  Container(
+                    width: 30,
+                    height: 30,
+                    decoration: BoxDecoration(
+                      color: SnowStyle.softAccent,
+                      borderRadius: BorderRadius.circular(9),
+                    ),
+                    child: const Icon(Icons.inventory_2_outlined,
+                        size: 16, color: SnowStyle.accent),
+                  ),
+                  const SizedBox(width: 10),
+                  SizedBox(
+                    width: 90,
+                    child: Text(c.$1,
+                        style: const TextStyle(
+                            fontSize: 13, fontWeight: FontWeight.w700)),
+                  ),
+                  Expanded(
+                    child: Text(c.$2,
+                        style: const TextStyle(
+                            fontSize: 11.5, color: SnowStyle.muted)),
+                  ),
+                  Text(c.$3,
+                      style: const TextStyle(
+                          fontSize: 10.5, color: SnowStyle.accent)),
+                ],
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _row(String label, String value) {
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
@@ -224,15 +303,10 @@ class _LocalPageState extends State<LocalPage> {
               style: const TextStyle(fontSize: 12.5, color: SnowStyle.muted)),
           const SizedBox(width: 12),
           Expanded(
-            child: SelectableText(
-              value,
-              textAlign: TextAlign.right,
-              style: TextStyle(
-                fontSize: 12.5,
-                fontFamily: mono ? 'Menlo' : null,
-                fontFeatures: SnowStyle.tabular,
-              ),
-            ),
+            child: SelectableText(value,
+                textAlign: TextAlign.right,
+                style: const TextStyle(fontSize: 12.5,
+                    fontFeatures: SnowStyle.tabular)),
           ),
         ],
       ),
