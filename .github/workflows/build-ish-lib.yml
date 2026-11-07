@@ -84,6 +84,30 @@ jobs:
         print(''check-cc.sh 已 patch'')
 
         PY'
+    - name: 注入桥接层到 iSH 源码
+      run: 'cd native/ish
+
+        cp ../ios_bridge.c kernel/ios_bridge.c
+
+        python3 - <<''PY''
+
+        from pathlib import Path
+
+        m = Path(''meson.build'')
+
+        s = m.read_text(encoding=''utf-8'')
+
+        old = "    libish = library(''ish'', src,"
+
+        new = "    src += [''kernel/ios_bridge.c'']\n\n    libish = library(''ish'', src,"
+
+        assert old in s, ''libish 未匹配''
+
+        m.write_text(s.replace(old, new, 1), encoding=''utf-8'')
+
+        print(''meson.build 已注入 ios_bridge.c'')
+
+        PY'
     - name: 列出 Xcode targets
       run: 'cd native/ish
 
