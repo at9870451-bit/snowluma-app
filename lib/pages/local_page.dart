@@ -1,5 +1,8 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:path_provider/path_provider.dart';
 
 import '../core/app_state.dart';
 import '../core/snow_theme.dart';
@@ -73,6 +76,35 @@ class _LocalPageState extends State<LocalPage> {
       ..showSnackBar(const SnackBar(content: Text('已复制到剪贴板')));
   }
 
+  bool _exporting = false;
+
+  /// 把内置的离线部署包导出到 App 文档目录（iOS 可在「文件」App 里看到）。
+  Future<void> _exportOfflinePackage() async {
+    if (_exporting) return;
+    setState(() => _exporting = true);
+    try {
+      final data = await rootBundle
+          .load('assets/offline/snowluma-qqbot-offline.tar.gz');
+      final dir = await getApplicationDocumentsDirectory();
+      final file = File('${dir.path}/snowluma-qqbot-offline.tar.gz');
+      await file.writeAsBytes(data.buffer.asUint8List(), flush: true);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('已导出（${(data.lengthInBytes / 1024 / 1024).toStringAsFixed(1)} MB）到「文件」App：${file.path}'),
+          duration: const Duration(seconds: 5),
+        ),
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('导出失败：$e')));
+      }
+    } finally {
+      if (mounted) setState(() => _exporting = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final running = _status?['running'] == true;
@@ -133,6 +165,7 @@ class _LocalPageState extends State<LocalPage> {
                 _componentsCard(),
                 const SizedBox(height: 16),
                 _section('局域网部署（离线包）'),
+                _exportCard(),
                 _copyCard(
                   '① 下载离线包',
                   '在局域网设备（树莓派/NUC/家用服务器）的浏览器打开下面的地址，'
@@ -208,6 +241,58 @@ class _LocalPageState extends State<LocalPage> {
             style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700,
                 letterSpacing: 1, color: SnowStyle.muted)),
       );
+
+  Widget _exportCard() {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(16),
+      decoration: SnowStyle.card(),
+      child: Row(
+        children: [
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+                color: SnowStyle.softAccent,
+                borderRadius: BorderRadius.circular(10)),
+            child: const Icon(Icons.archive_outlined,
+                size: 19, color: SnowStyle.accent),
+          ),
+          const SizedBox(width: 10),
+          const Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('离线包已内置',
+                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
+                SizedBox(height: 4),
+                Text('安装脚本 + QQBot 程序，约 1.1 MB。导出后到 iOS「文件」App 取用，'
+                    '拷到目标设备即可部署。',
+                    style: TextStyle(
+                        fontSize: 12, color: SnowStyle.muted, height: 1.45)),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          FilledButton(
+            onPressed: _exporting ? null : _exportOfflinePackage,
+            style: FilledButton.styleFrom(
+              minimumSize: const Size(0, 34),
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              visualDensity: VisualDensity.compact,
+            ),
+            child: _exporting
+                ? const SizedBox(
+                    width: 14,
+                    height: 14,
+                    child: CircularProgressIndicator(
+                        strokeWidth: 2, color: Colors.white))
+                : const Text('导出', style: TextStyle(fontSize: 12)),
+          ),
+        ],
+      ),
+    );
+  }
 
   Widget _copyCard(String title, String desc, {required String code}) {
     return Container(
