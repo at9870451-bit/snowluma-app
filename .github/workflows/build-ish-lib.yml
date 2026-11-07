@@ -31,24 +31,23 @@ jobs:
 
       - name: 安装构建工具（meson / ninja / llvm）
         run: |
-          brew install meson ninja 2>&1 | tail -3
+          brew install meson ninja llvm 2>&1 | tail -3
           # llvm 是 keg-only，手动加入 PATH（macos-15-intel 前缀为 /usr/local）
           echo "/usr/local/opt/llvm/bin" >> "$GITHUB_PATH"
           meson --version
           ninja --version
-
-      - name: 下载完整 LLVM（提供 ELF 版 ld.lld）
-        run: |
-          curl -sL -o /tmp/llvm.tar.xz \
-            https://github.com/llvm/llvm-project/releases/download/llvmorg-18.1.8/clang+llvm-18.1.8-x86_64-apple-darwin.tar.xz
-          mkdir -p /tmp/llvm-full
-          tar -xJf /tmp/llvm.tar.xz -C /tmp/llvm-full --strip-components=1
-          ls -l /tmp/llvm-full/bin/ld.lld 2>/dev/null || ls -l /tmp/llvm-full/bin/lld 2>/dev/null || echo "!! 无 ld.lld"
-          # 放进用户默认 PATH 目录，xcode script phase 才能找到
+          echo "=== Homebrew llvm 链接器 ==="
+          ls -l /usr/local/opt/llvm/bin/ | grep -iE "lld" || echo "!! bin 下无 lld"
+          # 把 lld（ELF driver）放进 /usr/local/bin，xcode script phase 可通过用户 PATH 找到
           sudo mkdir -p /usr/local/bin
-          sudo ln -sf /tmp/llvm-full/bin/ld.lld /usr/local/bin/ld.lld
-          sudo ln -sf /tmp/llvm-full/bin/ld.lld /usr/local/bin/lld
-          /usr/local/bin/ld.lld --version 2>&1 | head -2 || true
+          for name in lld ld.lld; do
+            if [ -e "/usr/local/opt/llvm/bin/$name" ]; then
+              sudo ln -sf "/usr/local/opt/llvm/bin/$name" "/usr/local/bin/$name"
+              echo "已链接 /usr/local/bin/$name"
+            fi
+          done
+          /usr/local/bin/lld --version 2>&1 | head -1 || true
+          /usr/local/bin/ld.lld --version 2>&1 | head -1 || true
 
       - name: 列出 Xcode targets
         run: |
