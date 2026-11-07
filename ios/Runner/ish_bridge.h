@@ -2,7 +2,7 @@
 //  ish_bridge.h
 //  Runner
 //
-//  iSH 内嵌 Linux 沙盒桥接：暴露给 Flutter/原生侧的启动接口。
+//  iSH 内嵌 Linux 沙盒桥接：管道 stdio + 输出回调。
 //
 #ifndef ish_bridge_h
 #define ish_bridge_h
@@ -13,15 +13,18 @@ NS_ASSUME_NONNULL_BEGIN
 
 @interface ISHBridge : NSObject
 
-/// 在后台线程启动一个 Linux 会话。
-/// rootfs: Alpine rootfs 所在目录（App Documents 内）
-/// exe:    要执行的程序，如 /bin/sh
-/// envp:   以 \0 结尾的键值对字符串（如 "TERM=xterm\0PATH=/bin:/usr/bin\0\0"）
-/// 返回:   0 表示内核初始化成功并已启动会话（此函数通常不返回）；
-///         负值表示初始化失败（-errno）。
+/// 在后台线程启动 Linux 会话（stdio 走内部管道）。
+/// 返回 0 表示启动请求成功。
 + (int)startLinuxWithRootfs:(NSString *)rootfs
                         exe:(NSString *)exe
                        envp:(NSString *)envp;
+
+/// 向 iSH 的 stdin 写入文本（命令/输入）。
+/// 返回 0 表示写入成功。
++ (int)writeInput:(NSString *)text;
+
+/// 设置终端输出回调（iSH stdout/stderr 的文本块）。
++ (void)setOutputCallback:(void (^)(NSString *text))callback;
 
 @end
 
