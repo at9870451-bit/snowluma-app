@@ -11,6 +11,12 @@ native/amore_core/target/
 native/libs/ios/
 native/libs/macos/
 
+# iSH 静态库（路线 B 需要入库供链接）
+!native/libs/ios/libish.a
+!native/libs/ios/libish_emu.a
+!native/libs/ios/libfakefs.a
+!native/libs/ios/libiSHApp.a
+
 # Flutter 生成的脚手架中随构建变化的部分
 ios/Flutter/ephemeral/
 ios/.symlinks/
