@@ -172,6 +172,67 @@ class _IshSandboxPageState extends State<IshSandboxPage> {
     }
   }
 
+  /// 把 go-cqhttp 协议端 + 脚本解压到 rootfs/opt/go-cqhttp。
+  Future<void> _deployProtocol() async {
+    if (_preparing) return;
+    if (_rootfsState.contains('未解压')) {
+      await _ensureRootfs();
+      if (!mounted || _rootfsState.contains('失败')) return;
+    }
+    setState(() {
+      _preparing = true;
+      _term += '正在部署 go-cqhttp 协议端…\n';
+    });
+    try {
+      final rootfsDir = Directory(_rootfs);
+      final outDir = Directory('${rootfsDir.path}/opt/go-cqhttp');
+      outDir.createSync(recursive: true);
+
+      final data = await rootBundle
+          .load('assets/protocol/go-cqhttp_linux_386.tar.gz');
+      final tar = TarDecoder()
+          .decodeBytes(GZipDecoder().decodeBytes(data.buffer.asUint8List()));
+      int n = 0;
+      for (final file in tar) {
+        var name = file.name;
+        if (name.isEmpty || name.contains('..')) continue;
+        if (name.startsWith('./')) name = name.substring(2);
+        if (name.startsWith('/')) name = name.substring(1);
+        if (name.isEmpty) continue;
+        final target = File('${outDir.path}/$name');
+        if (file.isFile) {
+          target.parent.createSync(recursive: true);
+          target.writeAsBytesSync(file.content as List<int>);
+          n++;
+        } else {
+          Directory(target.path).createSync(recursive: true);
+        }
+      }
+      // 复制启动脚本和预设配置
+      final scriptData = await rootBundle
+          .load('assets/protocol/ish-qq-protocol.sh');
+      File('${outDir.path}/ish-qq-protocol.sh')
+          .writeAsBytesSync(scriptData.buffer.asUint8List(), flush: true);
+      final cfgData = await rootBundle
+          .load('assets/protocol/go-cqhttp-config.yml');
+      File('${outDir.path}/config.yml')
+          .writeAsBytesSync(cfgData.buffer.asUint8List(), flush: true);
+      if (!mounted) return;
+      setState(() {
+        _preparing = false;
+        _term += '协议端已部署到 /opt/go-cqhttp。\n'
+            '终端里运行：sh /opt/go-cqhttp/ish-qq-protocol.sh\n'
+            '（编辑 config.yml 把 uin 改成你的 QQ 号后执行）\n> ';
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _preparing = false;
+        _term += '部署失败：$e\n';
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -203,6 +264,12 @@ class _IshSandboxPageState extends State<IshSandboxPage> {
                         child: Text(_starting ? '启动中…' : '启动 Linux'),
                       ),
                     ],
+                  ),
+                  const SizedBox(height: 8),
+                  OutlinedButton.icon(
+                    onPressed: _preparing ? null : _deployProtocol,
+                    icon: const Icon(Icons.hub_outlined, size: 16),
+                    label: Text(_preparing ? '处理中…' : '部署 go-cqhttp 协议端'),
                   ),
                   const SizedBox(height: 10),
                   Expanded(

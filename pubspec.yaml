@@ -34,3 +34,6 @@ flutter:
   assets:
     - assets/offline/snowluma-qqbot-offline.tar.gz
     - assets/rootfs/alpine-minirootfs.tar.gz
+    - assets/protocol/go-cqhttp_linux_386.tar.gz
+    - assets/protocol/ish-qq-protocol.sh
+    - assets/protocol/go-cqhttp-config.yml
