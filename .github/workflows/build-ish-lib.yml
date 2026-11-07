@@ -1,110 +1,116 @@
-# 路线 B 第一阶段：把 iSH 内核编译成 iOS 静态库（libish.a 系列）
-# 目标：验证在 GitHub Actions macOS runner 上能产出可嵌入 Flutter 的 .a
-# VDSO：用 Zig（自带 ELF lld）替代 llvm clang，patch iSH 源码指向 zigcc
 name: Build iSH iOS Static Libraries
-
-on:
-  workflow_dispatch:
+'on':
+  workflow_dispatch: null
   push:
     paths:
-      - '.github/workflows/build-ish-lib.yml'
-      - 'native/ish/**'
-
+    - .github/workflows/build-ish-lib.yml
+    - native/ish/**
 permissions:
   contents: write
-
 jobs:
   build-ish:
     name: libish.a (iOS device)
     runs-on: macos-15-intel
     timeout-minutes: 60
-
     steps:
-      - uses: actions/checkout@v4
+    - uses: actions/checkout@v4
+    - name: Clone iSH (with submodules)
+      run: 'git clone --depth 1 --recurse-submodules https://github.com/ish-app/ish native/ish
 
-      - name: Clone iSH (with submodules)
-        run: |
-          git clone --depth 1 --recurse-submodules \
-            https://github.com/ish-app/ish native/ish
-          echo "=== iSH 顶层 ==="
-          ls native/ish | head -20
+        ls native/ish | head -20'
+    - name: 安装构建工具（meson / ninja / llvm / zig）
+      run: 'brew install meson ninja llvm zig 2>&1 | tail -4
 
-      - name: 安装构建工具（meson / ninja / llvm / zig）
-        run: |
-          brew install meson ninja llvm zig 2>&1 | tail -4
-          echo "/usr/local/opt/llvm/bin" >> "$GITHUB_PATH"
-          meson --version
-          ninja --version
-          zig version
+        echo "/usr/local/opt/llvm/bin" >> "$GITHUB_PATH"
 
-      - name: Patch iSH 使用 Zig 编译 VDSO
-        run: |
-          cd native/ish
-          printf '#!/bin/sh\nexec /usr/local/bin/zig cc "$@"\n' > /usr/local/bin/zigcc
-          chmod +x /usr/local/bin/zigcc
-          echo "zigcc 已创建"
-          python3 - <<'PY'
-from pathlib import Path
-p = Path('vdso/meson.build')
-s = p.read_text(encoding='utf-8')
-old_clang = "find_program('/usr/local/opt/llvm/bin/clang', '/opt/homebrew/opt/llvm/bin/clang', '/opt/local/bin/clang', 'clang')"
-new_clang = "find_program('/usr/local/bin/zigcc', 'zigcc', 'clang')"
-assert old_clang in s, "clang find_program 未匹配"
-s = s.replace(old_clang, new_clang, 1)
-old_vdso = "vdso_compiler = [clang, '-target', 'i386-linux', '-fuse-ld=lld']"
-new_vdso = "vdso_compiler = [clang, '-target', 'i386-linux']"
-assert old_vdso in s, "vdso_compiler 未匹配"
-s = s.replace(old_vdso, new_vdso, 1)
-Path('vdso/meson.build').write_text(s, encoding='utf-8')
-print("vdso/meson.build 已 patch")
-PY
-          python3 - <<'PY'
-from pathlib import Path
-p = Path('vdso/check-cc.sh')
-s = p.read_text(encoding='utf-8')
-s = s.replace(' -fuse-ld=lld ', ' ')
-Path('vdso/check-cc.sh').write_text(s, encoding='utf-8')
-print("check-cc.sh 已 patch")
-PY
+        meson --version
 
-      - name: 列出 Xcode targets
-        run: |
-          cd native/ish
-          xcodebuild -project iSH.xcodeproj -list 2>&1 | head -50
+        ninja --version
 
-      - name: 编译 libish（真机 arm64 静态库）
-        run: |
-          cd native/ish
-          export PATH="/usr/local/opt/llvm/bin:$PATH"
-          export CC=/usr/local/opt/llvm/bin/clang
-          export CXX=/usr/local/opt/llvm/bin/clang++
-          which clang && clang --version | head -1
-          set -o pipefail
-          xcodebuild -project iSH.xcodeproj \
-            -target libish \
-            -configuration Release \
-            -sdk iphoneos \
-            CODE_SIGNING_ALLOWED=NO \
-            CODE_SIGNING_REQUIRED=NO \
-            build 2>&1 | tail -60
+        zig version'
+    - name: Patch iSH 使用 Zig 编译 VDSO
+      run: 'cd native/ish
 
-      - name: 收集 .a 产物
-        run: |
-          mkdir -p build/ish-libs
-          find native/ish -name "*.a" 2>/dev/null | while read f; do
-            echo "找到: $f"
-            cp "$f" build/ish-libs/
-          done
-          find "$HOME/Library/Developer/Xcode/DerivedData" -name "*.a" 2>/dev/null | head -10 | while read f; do
-            echo "DerivedData: $f"
-            cp "$f" build/ish-libs/ 2>/dev/null || true
-          done
-          echo "=== 产物清单 ==="
-          ls -la build/ish-libs/ 2>/dev/null || echo "（无 .a 产物，需调试构建）"
+        printf ''#!/bin/sh\nexec /usr/local/bin/zig cc "$@"\n'' > /usr/local/bin/zigcc
 
-      - uses: actions/upload-artifact@v4
-        with:
-          name: ish-ios-libs
-          path: build/ish-libs/
-          retention-days: 30
-          if-no-files-found: ignore
+        chmod +x /usr/local/bin/zigcc
+
+        echo zigcc 已创建
+
+        python3 - <<''PY''
+
+        from pathlib import Path
+
+        p = Path(''vdso/meson.build'')
+
+        s = p.read_text(encoding=''utf-8'')
+
+        old_clang = "find_program(''/usr/local/opt/llvm/bin/clang'', ''/opt/homebrew/opt/llvm/bin/clang'', ''/opt/local/bin/clang'', ''clang'')"
+
+        new_clang = "find_program(''/usr/local/bin/zigcc'', ''zigcc'', ''clang'')"
+
+        assert old_clang in s, ''clang find_program 未匹配''
+
+        s = s.replace(old_clang, new_clang, 1)
+
+        old_vdso = "vdso_compiler = [clang, ''-target'', ''i386-linux'', ''-fuse-ld=lld'']"
+
+        new_vdso = "vdso_compiler = [clang, ''-target'', ''i386-linux'']"
+
+        assert old_vdso in s, ''vdso_compiler 未匹配''
+
+        s = s.replace(old_vdso, new_vdso, 1)
+
+        Path(''vdso/meson.build'').write_text(s, encoding=''utf-8'')
+
+        print(''vdso/meson.build 已 patch'')
+
+        PY
+
+        python3 - <<''PY''
+
+        from pathlib import Path
+
+        p = Path(''vdso/check-cc.sh'')
+
+        s = p.read_text(encoding=''utf-8'')
+
+        s = s.replace('' -fuse-ld=lld '', '' '')
+
+        Path(''vdso/check-cc.sh'').write_text(s, encoding=''utf-8'')
+
+        print(''check-cc.sh 已 patch'')
+
+        PY'
+    - name: 列出 Xcode targets
+      run: 'cd native/ish
+
+        xcodebuild -project iSH.xcodeproj -list 2>&1 | head -50'
+    - name: 编译 libish（真机 arm64 静态库）
+      run: 'cd native/ish
+
+        export PATH="/usr/local/opt/llvm/bin:$PATH"
+
+        export CC=/usr/local/opt/llvm/bin/clang
+
+        export CXX=/usr/local/opt/llvm/bin/clang++
+
+        which clang && clang --version | head -1
+
+        set -o pipefail
+
+        xcodebuild -project iSH.xcodeproj -target libish -configuration Release -sdk iphoneos CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO build 2>&1 | tail -60'
+    - name: 收集 .a 产物
+      run: 'mkdir -p build/ish-libs
+
+        find native/ish -name ''*.a'' 2>/dev/null | while read f; do cp "$f" build/ish-libs/; done
+
+        find "$HOME/Library/Developer/Xcode/DerivedData" -name ''*.a'' 2>/dev/null | head -10 | while read f; do cp "$f" build/ish-libs/ 2>/dev/null || true; done
+
+        ls -la build/ish-libs/ 2>/dev/null || echo ''（无 .a 产物，需调试构建）'''
+    - uses: actions/upload-artifact@v4
+      with:
+        name: ish-ios-libs
+        path: build/ish-libs/
+        retention-days: 30
+        if-no-files-found: ignore
