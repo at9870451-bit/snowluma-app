@@ -29,25 +29,48 @@ jobs:
           echo "=== iSH 顶层 ==="
           ls native/ish | head -20
 
-      - name: 安装构建工具（meson / ninja / llvm）
+      - name: 安装构建工具（meson / ninja / llvm / zig）
         run: |
-          brew install meson ninja llvm 2>&1 | tail -3
-          # llvm 是 keg-only，手动加入 PATH（macos-15-intel 前缀为 /usr/local）
+          brew install meson ninja llvm zig 2>&1 | tail -4
           echo "/usr/local/opt/llvm/bin" >> "$GITHUB_PATH"
           meson --version
           ninja --version
-          echo "=== Homebrew llvm 链接器 ==="
-          ls -l /usr/local/opt/llvm/bin/ | grep -iE "lld" || echo "!! bin 下无 lld"
-          # 把 lld（ELF driver）放进 /usr/local/bin，xcode script phase 可通过用户 PATH 找到
-          sudo mkdir -p /usr/local/bin
-          for name in lld ld.lld; do
-            if [ -e "/usr/local/opt/llvm/bin/$name" ]; then
-              sudo ln -sf "/usr/local/opt/llvm/bin/$name" "/usr/local/bin/$name"
-              echo "已链接 /usr/local/bin/$name"
-            fi
-          done
-          /usr/local/bin/lld --version 2>&1 | head -1 || true
-          /usr/local/bin/ld.lld --version 2>&1 | head -1 || true
+          zig version
+
+      - name: Patch iSH 使用 Zig 编译 VDSO（自带 ELF lld）
+        run: |
+          cd native/ish
+          # 创建 zig cc 包装器（clang 兼容接口）
+          cat > /usr/local/bin/zigcc <<'EOF'
+#!/bin/sh
+exec /usr/local/bin/zig cc "$@"
+EOF
+          chmod +x /usr/local/bin/zigcc
+          echo "zigcc 已创建"
+          # 把 vdso 编译器从 llvm clang 换成 zigcc，并去掉 -fuse-ld（zig cc 内置 lld）
+          python3 - <<'PY'
+from pathlib import Path
+p = Path('vdso/meson.build')
+s = p.read_text(encoding='utf-8')
+old_clang = "find_program('/usr/local/opt/llvm/bin/clang', '/opt/homebrew/opt/llvm/bin/clang', '/opt/local/bin/clang', 'clang')"
+new_clang = "find_program('/usr/local/bin/zigcc', 'zigcc', 'clang')"
+assert old_clang in s, "clang find_program 未匹配"
+s = s.replace(old_clang, new_clang, 1)
+old_vdso = "vdso_compiler = [clang, '-target', 'i386-linux', '-fuse-ld=lld']"
+new_vdso = "vdso_compiler = [clang, '-target', 'i386-linux']"
+assert old_vdso in s, "vdso_compiler 未匹配"
+s = s.replace(old_vdso, new_vdso, 1)
+Path('vdso/meson.build').write_text(s, encoding='utf-8')
+print("vdso/meson.build 已 patch")
+PY
+          python3 - <<'PY'
+from pathlib import Path
+p = Path('vdso/check-cc.sh')
+s = p.read_text(encoding='utf-8')
+s = s.replace(' -fuse-ld=lld ', ' ')
+Path('vdso/check-cc.sh').write_text(s, encoding='utf-8')
+print("check-cc.sh 已 patch")
+PY
 
       - name: 列出 Xcode targets
         run: |
