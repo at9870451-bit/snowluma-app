@@ -29,11 +29,15 @@ jobs:
           echo "=== iSH 顶层 ==="
           ls native/ish | head -20
 
-      - name: 安装构建工具（meson / ninja）
+      - name: 安装构建工具（meson / ninja / llvm）
         run: |
-          brew install meson ninja 2>&1 | tail -3
+          brew install meson ninja llvm 2>&1 | tail -5
+          # llvm 是 keg-only，手动加入 PATH（macos-15-intel 前缀为 /usr/local）
+          echo "/usr/local/opt/llvm/bin" >> "$GITHUB_PATH"
+          echo "$PATH" | grep -q "/usr/local/opt/llvm" || true
           meson --version
           ninja --version
+          ls /usr/local/opt/llvm/bin/ld64.lld 2>/dev/null || ls /usr/local/opt/llvm/bin/lld 2>/dev/null || true
 
       - name: 列出 Xcode targets
         run: |
