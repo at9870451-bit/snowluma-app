@@ -158,6 +158,54 @@ class _IshSandboxPageState extends State<IshSandboxPage> {
     }
   }
 
+  /// 把 Node.js（Alpine x86）解压到 rootfs/usr/。
+  Future<void> _installNode() async {
+    if (_preparing) return;
+    if (_rootfsState.contains('未解压')) {
+      await _ensureRootfs();
+      if (!mounted || _rootfsState.contains('失败')) return;
+    }
+    setState(() {
+      _preparing = true;
+      _term += '正在安装 Node.js…\n';
+    });
+    try {
+      final rootfsDir = Directory(_rootfs);
+      final data = await rootBundle
+          .load('assets/protocol/nodejs-alpine-x86.tar.gz');
+      final tar = TarDecoder()
+          .decodeBytes(GZipDecoder().decodeBytes(data.buffer.asUint8List()));
+      int n = 0;
+      for (final file in tar) {
+        var name = file.name;
+        if (name.isEmpty || name.contains('..')) continue;
+        if (name.startsWith('./')) name = name.substring(2);
+        if (name.startsWith('/')) name = name.substring(1);
+        if (name.isEmpty) continue;
+        final target = File('${rootfsDir.path}/$name');
+        if (file.isFile) {
+          target.parent.createSync(recursive: true);
+          target.writeAsBytesSync(file.content as List<int>);
+          n++;
+        } else {
+          Directory(target.path).createSync(recursive: true);
+        }
+      }
+      if (!mounted) return;
+      setState(() {
+        _preparing = false;
+        _term += 'Node.js 已安装（$n 文件）到 /usr。\n'
+            '终端里运行：node --version\n> ';
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _preparing = false;
+        _term += 'Node.js 安装失败：$e\n';
+      });
+    }
+  }
+
   Future<void> _sendCommand() async {
     final cmd = _inputController.text;
     if (cmd.trim().isEmpty) return;
@@ -266,10 +314,24 @@ class _IshSandboxPageState extends State<IshSandboxPage> {
                     ],
                   ),
                   const SizedBox(height: 8),
-                  OutlinedButton.icon(
-                    onPressed: _preparing ? null : _deployProtocol,
-                    icon: const Icon(Icons.hub_outlined, size: 16),
-                    label: Text(_preparing ? '处理中…' : '部署 go-cqhttp 协议端'),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: _preparing ? null : _installNode,
+                          icon: const Icon(Icons.javascript_outlined, size: 16),
+                          label: Text(_preparing ? '处理中…' : '安装 Node.js'),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: _preparing ? null : _deployProtocol,
+                          icon: const Icon(Icons.hub_outlined, size: 16),
+                          label: Text(_preparing ? '处理中…' : '部署 go-cqhttp'),
+                        ),
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 10),
                   Expanded(
