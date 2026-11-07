@@ -31,13 +31,24 @@ jobs:
 
       - name: 安装构建工具（meson / ninja / llvm）
         run: |
-          brew install meson ninja llvm 2>&1 | tail -5
+          brew install meson ninja 2>&1 | tail -3
           # llvm 是 keg-only，手动加入 PATH（macos-15-intel 前缀为 /usr/local）
           echo "/usr/local/opt/llvm/bin" >> "$GITHUB_PATH"
-          echo "$PATH" | grep -q "/usr/local/opt/llvm" || true
           meson --version
           ninja --version
-          ls /usr/local/opt/llvm/bin/ld64.lld 2>/dev/null || ls /usr/local/opt/llvm/bin/lld 2>/dev/null || true
+
+      - name: 下载完整 LLVM（提供 ELF 版 ld.lld）
+        run: |
+          curl -sL -o /tmp/llvm.tar.xz \
+            https://github.com/llvm/llvm-project/releases/download/llvmorg-18.1.8/clang+llvm-18.1.8-x86_64-apple-darwin.tar.xz
+          mkdir -p /tmp/llvm-full
+          tar -xJf /tmp/llvm.tar.xz -C /tmp/llvm-full --strip-components=1
+          ls -l /tmp/llvm-full/bin/ld.lld 2>/dev/null || ls -l /tmp/llvm-full/bin/lld 2>/dev/null || echo "!! 无 ld.lld"
+          # 放进用户默认 PATH 目录，xcode script phase 才能找到
+          sudo mkdir -p /usr/local/bin
+          sudo ln -sf /tmp/llvm-full/bin/ld.lld /usr/local/bin/ld.lld
+          sudo ln -sf /tmp/llvm-full/bin/ld.lld /usr/local/bin/lld
+          /usr/local/bin/ld.lld --version 2>&1 | head -2 || true
 
       - name: 列出 Xcode targets
         run: |
@@ -47,18 +58,12 @@ jobs:
       - name: 编译 libish（真机 arm64 静态库）
         run: |
           cd native/ish
-          # 让 meson 使用 LLVM 的 clang，并提供名为 lld 的链接器
+          # 使用 LLVM clang（支持 -fuse-ld=lld），ld.lld 已在 /usr/local/bin
           export PATH="/usr/local/opt/llvm/bin:$PATH"
           export CC=/usr/local/opt/llvm/bin/clang
           export CXX=/usr/local/opt/llvm/bin/clang++
-          # Homebrew llvm 提供 ld64.lld，但 meson 找的是 "lld" → 建符号链接
-          mkdir -p /tmp/ish-bin
-          for name in lld ld.lld ld64.lld; do
-            ln -sf /usr/local/opt/llvm/bin/ld64.lld /tmp/ish-bin/$name
-          done
-          export PATH="/tmp/ish-bin:$PATH"
           which clang && clang --version | head -1
-          ls -l /tmp/ish-bin/
+          which ld.lld && ld.lld --version | head -1
           set -o pipefail
           xcodebuild -project iSH.xcodeproj \
             -target libish \
