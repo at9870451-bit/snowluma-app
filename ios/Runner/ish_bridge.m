@@ -2,10 +2,7 @@
 //  ish_bridge.m
 //  Runner
 //
-//  iSH 内嵌 Linux 沙盒桥接：
-//  - 创建管道，stdin/stdout 接入 iSH（libish.a 的 ish_bridge_start_fds）
-//  - 读取线程把内核输出通过回调推给 Flutter（EventChannel）
-//  - writeInput 把 Flutter 输入写入 iSH stdin
+//  iSH 内嵌 Linux 沙盒桥接：管道 stdio + 输出回调。
 //
 #import "ish_bridge.h"
 
@@ -28,31 +25,10 @@ typedef struct {
     int stdout_fd;
 } session_args_t;
 
-@interface ISHBridge ()
-@property(nonatomic) int inputWriteFd;
-@property(nonatomic) int outputReadFd;
-@property(nonatomic, copy) void (^outputCallback)(NSString *);
-@end
-
-@implementation ISHBridge
-
-static ISHBridge *sharedInstance = nil;
-
-+ (instancetype)sharedInstance {
-    static dispatch_once_t onceToken;
-    dispatch_once(&onceToken, ^{
-      sharedInstance = [[ISHBridge alloc] init];
-      sharedInstance.inputWriteFd = -1;
-      sharedInstance.outputReadFd = -1;
-    });
-    return sharedInstance;
-}
-
 static void *run_linux_thread(void *arg) {
     session_args_t *sa = (session_args_t *)arg;
     intptr_t err = (intptr_t)ish_bridge_start_fds(
         sa->rootfs, sa->exe, sa->envp, sa->stdin_fd, sa->stdout_fd);
-    // 内核通常不返回；返回则关闭 fd
     if (sa->stdin_fd >= 0) close(sa->stdin_fd);
     if (sa->stdout_fd >= 0) close(sa->stdout_fd);
     free(sa->rootfs);
@@ -77,7 +53,25 @@ static void *output_reader_thread(void *arg) {
     return NULL;
 }
 
-@implementation ISHBridge (Shared)
+@interface ISHBridge ()
+@property(nonatomic) int inputWriteFd;
+@property(nonatomic) int outputReadFd;
+@property(nonatomic, copy) void (^outputCallback)(NSString *);
+@end
+
+@implementation ISHBridge
+
+static ISHBridge *sharedInstance = nil;
+
++ (instancetype)sharedInstance {
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+      sharedInstance = [[ISHBridge alloc] init];
+      sharedInstance.inputWriteFd = -1;
+      sharedInstance.outputReadFd = -1;
+    });
+    return sharedInstance;
+}
 
 + (int)startLinuxWithRootfs:(NSString *)rootfs
                         exe:(NSString *)exe
@@ -125,7 +119,6 @@ static void *output_reader_thread(void *arg) {
     }
     pthread_detach(t);
 
-    // 启动输出读取线程（bridge 通过 __bridge_retained 保持存活）
     pthread_t rt;
     if (pthread_create(&rt, NULL, output_reader_thread,
                        (__bridge_retained void *)bridge) == 0) {
