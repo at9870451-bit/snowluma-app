@@ -164,6 +164,33 @@ class _LocalPageState extends State<LocalPage> {
                 _section('环境组件'),
                 _componentsCard(),
                 const SizedBox(height: 16),
+                _section('iSH 沙盒部署（iPhone 当服务器）'),
+                _copyCard(
+                  '① 安装 iSH 并导出离线包',
+                  'App Store 搜索安装 iSH（Alpine Linux 环境）。'
+                  '然后回到本页点上方「导出」，把离线包存到「文件」App。',
+                  code: 'iSH 内访问文件：mount -t ios . /mnt',
+                ),
+                _copyCard(
+                  '② iSH 里一键安装',
+                  '在 iSH 里进入离线包目录，解压并运行 iSH 专用安装脚本'
+                  '（自动装 Python、解压 QQBot、装依赖、启动服务）：',
+                  code: 'cd /mnt/你的离线包目录\n'
+                      'tar -xzf snowluma-qqbot-offline.tar.gz\n'
+                      'cd offline && sh ish-install.sh',
+                ),
+                _copyCard(
+                  '③ App 连接本机沙盒',
+                  'QQBot 启动后监听本机 6199，在 App「接入」页填写：',
+                  code: 'http://127.0.0.1:6199',
+                ),
+                const SizedBox(height: 6),
+                const Text(
+                    '限制说明：iSH 里能跑 Python 版 QQBot（面板/插件/AI 逻辑），'
+                    '但 NapCat（QQ 协议端）无法在 iSH 运行，QQ 消息收发需另配协议端；'
+                    'iOS 会挂起长时间后台的 iSH，需要保持前台。',
+                    style: TextStyle(fontSize: 11, color: SnowStyle.muted, height: 1.5)),
+                const SizedBox(height: 16),
                 _section('局域网部署（离线包）'),
                 _exportCard(),
                 _copyCard(
