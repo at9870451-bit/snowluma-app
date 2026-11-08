@@ -108,6 +108,30 @@ jobs:
         print(''meson.build 已注入 ios_bridge.c'')
 
         PY'
+    - name: 注入 iOS 兼容层到 iSH 源码
+      run: 'cd native/ish
+
+        cp ../ios_compat.c kernel/ios_compat.c
+
+        python3 - <<''PY''
+
+        from pathlib import Path
+
+        m = Path(''meson.build'')
+
+        s = m.read_text(encoding=''utf-8'')
+
+        old = "    src += [''kernel/ios_bridge.c'']"
+
+        new = "    src += [''kernel/ios_bridge.c'', ''kernel/ios_compat.c'']"
+
+        assert old in s, ''src 锚点未匹配''
+
+        m.write_text(s.replace(old, new, 1), encoding=''utf-8'')
+
+        print(''meson.build 已注入 ios_compat.c'')
+
+        PY'
     - name: 列出 Xcode targets
       run: 'cd native/ish
 
