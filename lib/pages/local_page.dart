@@ -216,13 +216,13 @@ class _LocalPageState extends State<LocalPage> {
                       fontWeight: FontWeight.w800)),
               const SizedBox(height: 8),
               _targetRadio(
-                value: _DeployTarget.snowlumaQqbot,
+                _DeployTarget.snowlumaQqbot,
                 title: 'SnowLuma + QQBot',
                 desc: '在 iPhone 沙盒内完成：rootfs + Node + Python + QQBot + go-cqhttp',
               ),
               const SizedBox(height: 8),
               _targetRadio(
-                value: _DeployTarget.napcatAstrbot,
+                _DeployTarget.napcatAstrbot,
                 title: 'NapCat + AstrBot',
                 desc: '导出部署脚本，在本地 Linux 设备一键部署协议端与机器人框架',
               ),
