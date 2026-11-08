@@ -33,6 +33,7 @@ flutter:
   uses-material-design: true
   assets:
     - assets/offline/snowluma-qqbot-offline.tar.gz
+    - assets/offline/install-napcat-astrbot.sh
     - assets/rootfs/alpine-minirootfs.tar.gz
     - assets/protocol/go-cqhttp_linux_386.tar.gz
     - assets/protocol/ish-qq-protocol.sh

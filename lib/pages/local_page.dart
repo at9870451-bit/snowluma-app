@@ -252,6 +252,12 @@ class _LocalPageState extends State<LocalPage> {
               'tar -xzf snowluma-qqbot-offline.tar.gz\n'
               'cd offline && sh ish-install.sh',
         ),
+        const SizedBox(height: 10),
+        _copyCard(
+          '一键部署 NapCat + AstrBot（Linux）',
+          '在服务器/树莓派上一条命令部署 QQ 协议端 NapCat 和机器人框架 AstrBot：',
+          code: 'sudo bash install-napcat-astrbot.sh',
+        ),
       ],
     );
   }
