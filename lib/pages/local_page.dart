@@ -70,7 +70,7 @@ class _LocalPageState extends State<LocalPage> {
       _deploying = true;
       _deployProgress = 0;
     });
-    const steps = 9;
+    const steps = 5;
     void setStep(int i, String msg) {
       if (!mounted) return;
       setState(() {
@@ -109,40 +109,7 @@ class _LocalPageState extends State<LocalPage> {
       File('${dir.path}/alpine-rootfs/data/opt/go-cqhttp/config.yml')
           .writeAsBytesSync(cfgData.buffer.asUint8List(), flush: true);
 
-      // ===== 自动启动阶段 =====
-      setStep(7, '正在启动 Linux 沙盒…');
-      final dir2 = await getApplicationDocumentsDirectory();
-      final rootfs = '${dir2.path}/alpine-rootfs';
-      await _ishOut.receiveBroadcastStream().listen((ev) {
-        if (!mounted) return;
-        final t = ev.toString();
-        setState(() => _termLog = (_termLog + t).length > 1200
-            ? (_termLog + t).substring((_termLog + t).length - 1200)
-            : _termLog + t);
-      }, onError: (_) {});
-      await _ish.invokeMethod<void>('start', {
-        'rootfs': rootfs,
-        'exe': '/bin/sh',
-        'envp': 'TERM=xterm\u0000PATH=/usr/bin:/bin:/usr/sbin:/sbin\u0000HOME=/root\u0000\u0000',
-      });
-      await Future<void>.delayed(const Duration(milliseconds: 2500));
-
-      setStep(8, '正在启动 QQBot 服务…');
-      await _ish.invokeMethod<void>('write', {
-        'text': 'export PATH=/usr/bin:/bin:/usr/sbin:/sbin\n'
-                'cd /opt/qqbot && nohup python3 run.py --no-tray > /tmp/qqbot.log 2>&1 &\n'
-                'echo QQBot started\n',
-      });
-      await Future<void>.delayed(const Duration(milliseconds: 1800));
-
-      setStep(9, '正在启动 go-cqhttp 协议端…');
-      await _ish.invokeMethod<void>('write', {
-        'text': 'cd /opt/go-cqhttp && nohup ./go-cqhttp -c config.yml > /tmp/gocq.log 2>&1 &\n'
-                'echo go-cqhttp started\n',
-      });
-      await Future<void>.delayed(const Duration(milliseconds: 1500));
-
-      setStep(9, '✅ 全部自动部署完成！面板 http://127.0.0.1:6199');
+      setStep(5, '✅ 文件部署完成！');
       if (mounted) setState(() => _deploying = false);
     } catch (e) {
       if (mounted) {
