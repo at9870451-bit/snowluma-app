@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:archive/archive.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
@@ -21,12 +22,96 @@ class LocalPage extends StatefulWidget {
 
 class _LocalPageState extends State<LocalPage> {
   bool _exporting = false;
+  bool _deploying = false;
+  double _deployProgress = 0;
+  String _deployStatus = '准备就绪';
 
   void _copy(String text) {
     Clipboard.setData(ClipboardData(text: text));
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
       ..showSnackBar(const SnackBar(content: Text('已复制到剪贴板')));
+  }
+
+  /// 把内置 asset 的 tar.gz 解压到 Documents/alpine-rootfs 的指定子目录。
+  Future<int> _extractAsset(String asset, String targetSubDir) async {
+    final dir = await getApplicationDocumentsDirectory();
+    final target = Directory('${dir.path}/alpine-rootfs/$targetSubDir');
+    target.createSync(recursive: true);
+    final data = await rootBundle.load(asset);
+    final tar = TarDecoder()
+        .decodeBytes(GZipDecoder().decodeBytes(data.buffer.asUint8List()));
+    int n = 0;
+    for (final file in tar) {
+      var name = file.name;
+      if (name.isEmpty || name.contains('..')) continue;
+      if (name.startsWith('./')) name = name.substring(2);
+      if (name.startsWith('/')) name = name.substring(1);
+      if (name.isEmpty) continue;
+      final f = File('${target.path}/$name');
+      if (file.isFile) {
+        f.parent.createSync(recursive: true);
+        f.writeAsBytesSync(file.content as List<int>);
+        n++;
+      } else {
+        Directory(f.path).createSync(recursive: true);
+      }
+    }
+    return n;
+  }
+
+  /// 一键部署：依次解压 rootfs、Node.js、Python、QQBot、go-cqhttp。
+  Future<void> _deployAll() async {
+    if (_deploying) return;
+    setState(() {
+      _deploying = true;
+      _deployProgress = 0;
+    });
+    const steps = 6;
+    void setStep(int i, String msg) {
+      if (!mounted) return;
+      setState(() {
+        _deployProgress = i / steps;
+        _deployStatus = msg;
+      });
+    }
+
+    try {
+      setStep(1, '正在解压 Alpine rootfs…');
+      await _extractAsset('assets/rootfs/alpine-minirootfs.tar.gz', '.');
+
+      setStep(2, '正在安装 Node.js…');
+      await _extractAsset('assets/protocol/nodejs-alpine-x86.tar.gz', 'usr');
+
+      setStep(3, '正在安装 Python 环境…');
+      await _extractAsset('assets/protocol/python-alpine-x86.tar.gz', 'usr');
+
+      setStep(4, '正在安装 QQBot…');
+      await _extractAsset('assets/protocol/qqbot.tar.gz', 'opt/qqbot');
+
+      setStep(5, '正在部署 go-cqhttp 协议端…');
+      await _extractAsset('assets/protocol/go-cqhttp_linux_386.tar.gz',
+          'opt/go-cqhttp');
+      final scriptData = await rootBundle
+          .load('assets/protocol/ish-qq-protocol.sh');
+      final cfgData = await rootBundle
+          .load('assets/protocol/go-cqhttp-config.yml');
+      final dir = await getApplicationDocumentsDirectory();
+      File('${dir.path}/alpine-rootfs/opt/go-cqhttp/ish-qq-protocol.sh')
+          .writeAsBytesSync(scriptData.buffer.asUint8List(), flush: true);
+      File('${dir.path}/alpine-rootfs/opt/go-cqhttp/config.yml')
+          .writeAsBytesSync(cfgData.buffer.asUint8List(), flush: true);
+
+      setStep(6, '全部部署完成！可在「沙盒」中启动 Linux 终端。');
+      if (mounted) setState(() => _deploying = false);
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _deploying = false;
+          _deployStatus = '部署失败：$e';
+        });
+      }
+    }
   }
 
   Future<void> _exportOfflinePackage() async {
@@ -119,6 +204,51 @@ class _LocalPageState extends State<LocalPage> {
             '启动可交互终端、部署 go-cqhttp 协议端。',
             style: TextStyle(color: SnowStyle.muted, fontSize: 13, height: 1.5)),
         const SizedBox(height: 16),
+        // 一键部署卡片
+        Container(
+          padding: const EdgeInsets.all(18),
+          decoration: SnowStyle.card(color: SnowStyle.ink, radius: 24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const Text('一键部署本地机器人',
+                  style: TextStyle(color: Colors.white, fontSize: 18,
+                      fontWeight: FontWeight.w800)),
+              const SizedBox(height: 6),
+              const Text('自动完成：rootfs → Node.js → Python → QQBot → go-cqhttp',
+                  style: TextStyle(color: Color(0xFFB5B8C2), fontSize: 12,
+                      height: 1.4)),
+              const SizedBox(height: 14),
+              if (_deploying) ...[
+                LinearProgressIndicator(
+                  value: _deployProgress,
+                  minHeight: 6,
+                  backgroundColor: const Color(0xFF2A2B31),
+                  valueColor: const AlwaysStoppedAnimation(Color(0xFF4ADE80)),
+                ),
+                const SizedBox(height: 8),
+                Text(_deployStatus,
+                    style: const TextStyle(color: Color(0xFFD6D8DE),
+                        fontSize: 12, fontFeatures: SnowStyle.tabular)),
+              ] else
+                Text(_deployStatus,
+                    style: const TextStyle(color: Color(0xFFB5B8C2),
+                        fontSize: 12)),
+              const SizedBox(height: 14),
+              FilledButton.icon(
+                onPressed: _deploying ? null : _deployAll,
+                icon: _deploying
+                    ? const SizedBox(
+                        width: 16, height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2,
+                            color: Colors.white))
+                    : const Icon(Icons.rocket_launch_rounded),
+                label: Text(_deploying ? '部署中…' : '开始一键部署'),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 12),
         _card(
           'iSH 沙盒',
           '内置 Alpine rootfs + Node.js + go-cqhttp 协议端，iPhone 本地跑 Linux。',
