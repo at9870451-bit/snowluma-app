@@ -10,7 +10,7 @@ lib_flags = '$(inherited) -force_load "$(SRCROOT)/../native/libs/ios/libsnowluma
 # iSH（内嵌 Linux 沙盒）静态库：libish 内核 + emu 模拟器 + fakefs + App 层桥接
 ish_libs = %w[libish.a libish_emu.a libfakefs.a libiSHApp.a]
 ish_flags = ish_libs.map { |l| "-force_load \"$(SRCROOT)/../native/libs/ios/#{l}\"" }.join(' ')
-lib_flags = "#{lib_flags} #{ish_flags} -lsqlite3 -lresolv"
+lib_flags = "#{lib_flags} #{ish_flags} -lsqlite3 -lresolv -larchive"
 
 target = project.targets.find { |t| t.name == 'Runner' }
 abort('Runner target not found') unless target
