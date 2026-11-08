@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:isolate';
 import 'dart:io';
 
@@ -32,6 +33,10 @@ class _LocalPageState extends State<LocalPage> {
   String _deployStatus = '准备就绪';
   String _termLog = '';
   _DeployTarget _deployTarget = _DeployTarget.snowlumaQqbot;
+  String _gatewayWs = 'ws://154.12.16.204:3001';
+  String _gatewayToken = '4z4SwkSPqovkc_pmVD2_TEmjEJZINFYgehqZs8sT_xU';
+  bool _gatewayTesting = false;
+  String _gatewayResult = '';
   static const _ish = MethodChannel('snowluma/ish');
   static const _ishOut = EventChannel('snowluma/ish/output');
 
@@ -109,6 +114,23 @@ class _LocalPageState extends State<LocalPage> {
       File('${dir.path}/alpine-rootfs/data/opt/go-cqhttp/config.yml')
           .writeAsBytesSync(cfgData.buffer.asUint8List(), flush: true);
 
+      // 若配置了服务器共享协议端，把沙盒 QQBot 的协议端指向服务器（不再用本地 go-cqhttp）
+      final _gdir = await getApplicationDocumentsDirectory();
+      final cfgPath = '${_gdir.path}/alpine-rootfs/data/opt/qqbot/config/config.json';
+      final cfgFile = File(cfgPath);
+      if (cfgFile.existsSync()) {
+        try {
+          final cfg = jsonDecode(cfgFile.readAsStringSync()) as Map<String, dynamic>;
+          final proto = (cfg['protocol'] as Map<String, dynamic>?) ?? {};
+          proto['onebot_mode'] = 'forward';
+          proto['onebot_ws_url'] = _gatewayWs;
+          proto['onebot_api_url'] = _gatewayWs.replaceAll('ws://', 'http://').replaceAll('wss://', 'https://').replaceAll(':3001', ':3000');
+          proto['onebot_access_token'] = _gatewayToken;
+          cfg['protocol'] = proto;
+          cfgFile.writeAsStringSync(jsonEncode(cfg), flush: true);
+          _deployStatus = '✅ 部署完成（协议端已指向服务器共享 WS）';
+        } catch (_) {}
+      }
       setStep(5, '✅ 文件部署完成！');
       if (mounted) setState(() => _deploying = false);
     } catch (e) {
@@ -143,6 +165,37 @@ class _LocalPageState extends State<LocalPage> {
       }
     } finally {
       if (mounted) setState(() => _exporting = false);
+    }
+  }
+
+  /// 测试服务器共享协议端连接（OneBot WS + get_version）。
+  Future<void> _testSharedGateway() async {
+    if (_gatewayTesting) return;
+    setState(() {
+      _gatewayTesting = true;
+      _gatewayResult = '连接中…';
+    });
+    WebSocket? ws;
+    try {
+      final sep = _gatewayWs.contains('?') ? '&' : '?';
+      final wsUrl = '$_gatewayWs${sep}access_token=$_gatewayToken';
+      ws = await WebSocket.connect(wsUrl)
+          .timeout(const Duration(seconds: 8));
+      ws.add(jsonEncode({'action': 'get_version', 'params': {}, 'echo': 't1'}));
+      final reply = await ws.first.timeout(const Duration(seconds: 8));
+      final obj = jsonDecode(reply as String) as Map<String, dynamic>;
+      final d = (obj['data'] as Map<String, dynamic>?) ?? {};
+      if (!mounted) return;
+      setState(() {
+        _gatewayResult = '✅ 协议端在线：${d['app_name'] ?? ''} '
+            '${d['app_version'] ?? ''}${d['version'] ?? ''}';
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _gatewayResult = '❌ 连接失败：$e');
+    } finally {
+      await ws?.close();
+      if (mounted) setState(() => _gatewayTesting = false);
     }
   }
 
@@ -287,6 +340,78 @@ class _LocalPageState extends State<LocalPage> {
                             : '导出并复制命令'),
                 ),
               ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 12),
+        // 服务器共享协议端配置
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: SnowStyle.card(),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('服务器共享协议端',
+                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800)),
+              const SizedBox(height: 3),
+              const Text('使用服务器 SnowLuma 容器的 OneBot 协议端（QQ 已登录），'
+                  '一键部署的 QQBot 将自动指向该协议端，无需本地 go-cqhttp。',
+                  style: TextStyle(fontSize: 11.5, color: SnowStyle.muted,
+                      height: 1.45)),
+              const SizedBox(height: 10),
+              TextField(
+                controller: TextEditingController(text: _gatewayWs),
+                onChanged: (v) => _gatewayWs = v.trim(),
+                style: const TextStyle(fontSize: 12.5, fontFamily: 'Menlo'),
+                decoration: const InputDecoration(
+                  labelText: 'OneBot WS 地址',
+                  isDense: true,
+                  border: OutlineInputBorder(
+                      borderRadius: BorderRadius.all(Radius.circular(10))),
+                ),
+              ),
+              const SizedBox(height: 8),
+              TextField(
+                controller: TextEditingController(text: _gatewayToken),
+                onChanged: (v) => _gatewayToken = v.trim(),
+                style: const TextStyle(fontSize: 12.5, fontFamily: 'Menlo'),
+                obscureText: true,
+                decoration: const InputDecoration(
+                  labelText: 'Access Token',
+                  isDense: true,
+                  border: OutlineInputBorder(
+                      borderRadius: BorderRadius.all(Radius.circular(10))),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: _gatewayTesting ? null : _testSharedGateway,
+                      icon: _gatewayTesting
+                          ? const SizedBox(
+                              width: 14, height: 14,
+                              child: CircularProgressIndicator(strokeWidth: 2))
+                          : const Icon(Icons.wifi_tethering_rounded, size: 16),
+                      label: Text(_gatewayTesting ? '测试中…' : '测试连接'),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: FilledButton.icon(
+                      onPressed: () => _copy('$_gatewayWs?access_token=$_gatewayToken'),
+                      icon: const Icon(Icons.copy_rounded, size: 16),
+                      label: const Text('复制 WS'),
+                    ),
+                  ),
+                ],
+              ),
+              if (_gatewayResult.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                SelectableText(_gatewayResult,
+                    style: const TextStyle(fontSize: 11.5, height: 1.4)),
+              ],
             ],
           ),
         ),
