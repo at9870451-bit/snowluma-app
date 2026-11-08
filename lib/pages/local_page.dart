@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:isolate';
 import 'dart:io';
 
 import 'package:archive/archive.dart';
@@ -43,7 +44,8 @@ class _LocalPageState extends State<LocalPage> {
 
   String get _docRoot => '${Directory.systemTemp.path}/x'; // 占位，实际在方法里取
 
-  /// 把内置 asset 的 tar.gz 解压到 Documents/alpine-rootfs 的指定子目录。
+  /// 把内置 asset 的 tar.gz 解压到 Documents/alpine-rootfs/data 的指定子目录。
+  /// 解压放到独立 isolate，避免主线程长时间同步 IO 被 iOS watchdog 杀掉。
   Future<int> _extractAsset(String asset, String targetSubDir) async {
     final dir = await getApplicationDocumentsDirectory();
     // 解压 Alpine rootfs 前：清理旧的坏解压（旧版本把符号链接写成了空文件）
@@ -55,38 +57,10 @@ class _LocalPageState extends State<LocalPage> {
         rootDir.deleteSync(recursive: true);
       }
     }
-    final target = Directory('${dir.path}/alpine-rootfs/data/$targetSubDir');
-    target.createSync(recursive: true);
     final data = await rootBundle.load(asset);
-    final tar = TarDecoder()
-        .decodeBytes(GZipDecoder().decodeBytes(data.buffer.asUint8List()));
-    int n = 0;
-    for (final file in tar) {
-      var name = file.name;
-      if (name.isEmpty || name.contains('..')) continue;
-      if (name.startsWith('./')) name = name.substring(2);
-      if (name.startsWith('/')) name = name.substring(1);
-      if (name.isEmpty) continue;
-      final f = File('${target.path}/$name');
-      if (file.isSymbolicLink) {
-        final _raw = file.content;
-        final linkTarget = _raw is String
-            ? _raw
-            : String.fromCharCodes(_raw as List<int>);
-        f.parent.createSync(recursive: true);
-        try {
-          Link(f.path).createSync(linkTarget);
-        } catch (_) {}
-        n++;
-      } else if (file.isFile) {
-        f.parent.createSync(recursive: true);
-        f.writeAsBytesSync(file.content as List<int>);
-        n++;
-      } else {
-        Directory(f.path).createSync(recursive: true);
-      }
-    }
-    return n;
+    final bytes = data.buffer.asUint8List();
+    final targetPath = '${dir.path}/alpine-rootfs/data/$targetSubDir';
+    return Isolate.run(() => _extractTarSync(bytes, targetPath));
   }
 
   /// SnowLuma + QQBot 一键部署（iOS 沙盒内完成）。
@@ -734,4 +708,38 @@ class _LocalPageState extends State<LocalPage> {
       ),
     );
   }
+}
+
+/// 顶层函数：在独立 isolate 里解压 tar.gz（逐文件写盘）。
+int _extractTarSync(List<int> bytes, String targetPath) {
+  final target = Directory(targetPath)..createSync(recursive: true);
+  final tar = TarDecoder()
+      .decodeBytes(GZipDecoder().decodeBytes(bytes));
+  int n = 0;
+  for (final file in tar) {
+    var name = file.name;
+    if (name.isEmpty || name.contains('..')) continue;
+    if (name.startsWith('./')) name = name.substring(2);
+    if (name.startsWith('/')) name = name.substring(1);
+    if (name.isEmpty) continue;
+    final f = File('${target.path}/$name');
+    if (file.isSymbolicLink) {
+      final raw = file.content;
+      final linkTarget = raw is String
+          ? raw
+          : String.fromCharCodes(raw as List<int>);
+      f.parent.createSync(recursive: true);
+      try {
+        Link(f.path).createSync(linkTarget);
+      } catch (_) {}
+      n++;
+    } else if (file.isFile) {
+      f.parent.createSync(recursive: true);
+      f.writeAsBytesSync(file.content as List<int>);
+      n++;
+    } else {
+      Directory(f.path).createSync(recursive: true);
+    }
+  }
+  return n;
 }
