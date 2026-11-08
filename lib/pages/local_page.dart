@@ -199,6 +199,46 @@ class _LocalPageState extends State<LocalPage> {
     }
   }
 
+  /// 在当前页面直接启动沙盒 Linux（等价于沙盒页的「启动 Linux」）。
+  Future<void> _startLinuxNow() async {
+    if (_deploying) return;
+    setState(() {
+      _deploying = true;
+      _deployStatus = '正在启动 Linux 沙盒…';
+      _termLog = '';
+    });
+    try {
+      final dir = await getApplicationDocumentsDirectory();
+      final rootfs = '${dir.path}/alpine-rootfs';
+      await _ishOut.receiveBroadcastStream().listen((ev) {
+        if (!mounted) return;
+        final t = ev.toString();
+        setState(() => _termLog = (_termLog + t).length > 1200
+            ? (_termLog + t).substring((_termLog + t).length - 1200)
+            : _termLog + t);
+      }, onError: (_) {});
+      try {
+        await _ish.invokeMethod<void>('start', {
+          'rootfs': rootfs,
+          'exe': '/bin/sh',
+          'envp': 'TERM=xterm\u0000PATH=/usr/bin:/bin:/usr/sbin:/sbin\u0000HOME=/root\u0000\u0000',
+        });
+      } catch (_) {
+        // 已启动会抛错，忽略
+      }
+      setState(() => _deployStatus = '已请求启动。若 10 秒内无输出说明启动失败（闪退/内核崩溃）。');
+      await Future<void>.delayed(const Duration(seconds: 2));
+      if (mounted) setState(() => _deploying = false);
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _deploying = false;
+          _deployStatus = '启动异常：$e';
+        });
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return DefaultTabController(
@@ -318,27 +358,47 @@ class _LocalPageState extends State<LocalPage> {
                     style: const TextStyle(color: Color(0xFFB5B8C2),
                         fontSize: 12)),
               const SizedBox(height: 14),
-              FilledButton.icon(
-                onPressed: _deploying
-                    ? null
-                    : (_deployTarget == _DeployTarget.snowlumaQqbot
-                        ? _deployAll
-                        : _prepareNapcatAstrbot),
-                icon: _deploying
-                    ? const SizedBox(
-                        width: 16, height: 16,
-                        child: CircularProgressIndicator(strokeWidth: 2,
-                            color: Colors.white))
-                    : Icon(_deployTarget == _DeployTarget.snowlumaQqbot
-                        ? Icons.rocket_launch_rounded
-                        : Icons.terminal_rounded),
-                label: Text(
-                    _deploying
-                        ? '部署中…'
-                        : (_deployTarget == _DeployTarget.snowlumaQqbot
-                            ? '开始一键部署'
-                            : '导出并复制命令'),
-                ),
+              Row(
+                children: [
+                  Expanded(
+                    flex: 3,
+                    child: FilledButton.icon(
+                      onPressed: _deploying
+                          ? null
+                          : (_deployTarget == _DeployTarget.snowlumaQqbot
+                              ? _deployAll
+                              : _prepareNapcatAstrbot),
+                      icon: _deploying
+                          ? const SizedBox(
+                              width: 16, height: 16,
+                              child: CircularProgressIndicator(strokeWidth: 2,
+                                  color: Colors.white))
+                          : Icon(_deployTarget == _DeployTarget.snowlumaQqbot
+                              ? Icons.rocket_launch_rounded
+                              : Icons.terminal_rounded),
+                      label: Text(
+                          _deploying
+                              ? '部署中…'
+                              : (_deployTarget == _DeployTarget.snowlumaQqbot
+                                  ? '一键部署'
+                                  : '导出命令')),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    flex: 2,
+                    child: OutlinedButton.icon(
+                      onPressed: _deploying ? null : _startLinuxNow,
+                      icon: const Icon(Icons.play_arrow_rounded, size: 18,
+                          color: Color(0xFF4ADE80)),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: Colors.white,
+                        side: const BorderSide(color: Color(0xFF4ADE80)),
+                      ),
+                      label: const Text('启动 Linux'),
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
