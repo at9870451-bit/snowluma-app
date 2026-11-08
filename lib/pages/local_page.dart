@@ -4,15 +4,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
 
-import '../core/app_state.dart';
 import '../core/snow_theme.dart';
 import 'ish_sandbox_page.dart';
 
-/// 本地部署 — AstrBot 风格顶部 4 Tab：
-///   总览：服务器状态与连接信息
-///   沙盒：iSH 内嵌 Linux 沙盒入口与说明
-///   部署：局域网离线部署（离线包导出 + 安装命令）
+/// 本地部署 — 完全本地，不依赖服务器。AstrBot 风格顶部 4 Tab：
+///   沙盒：App 内嵌 iSH Linux 沙盒入口
+///   部署：离线包导出 / 局域网设备一键安装 / NapCat+AstrBot
 ///   组件：运行环境组件清单
+///   说明：本地部署流程与限制
 class LocalPage extends StatefulWidget {
   const LocalPage({super.key});
 
@@ -21,52 +20,7 @@ class LocalPage extends StatefulWidget {
 }
 
 class _LocalPageState extends State<LocalPage> {
-  Map<String, dynamic>? _status;
-  bool _checking = true;
-  String? _err;
   bool _exporting = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _check();
-  }
-
-  Future<void> _check() async {
-    setState(() {
-      _checking = true;
-      _err = null;
-    });
-    try {
-      final api = appState.client;
-      if (api == null) {
-        if (mounted) {
-          setState(() {
-            _checking = false;
-            _err = '尚未连接服务器';
-          });
-        }
-        return;
-      }
-      final r = await api.status();
-      if (!mounted) return;
-      setState(() {
-        _status = r;
-        _checking = false;
-      });
-    } catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _checking = false;
-        _err = e.toString();
-      });
-    }
-  }
-
-  String get _host {
-    final u = Uri.tryParse(appState.baseUrl);
-    return (u != null && u.host.isNotEmpty) ? u.host : '服务器IP';
-  }
 
   void _copy(String text) {
     Clipboard.setData(ClipboardData(text: text));
@@ -121,10 +75,10 @@ class _LocalPageState extends State<LocalPage> {
             unselectedLabelColor: SnowStyle.muted,
             dividerColor: Colors.transparent,
             tabs: [
-              Tab(text: '总览'),
               Tab(text: '沙盒'),
               Tab(text: '部署'),
               Tab(text: '组件'),
+              Tab(text: '说明'),
             ],
           ),
         ),
@@ -134,10 +88,10 @@ class _LocalPageState extends State<LocalPage> {
               constraints: const BoxConstraints(maxWidth: 820),
               child: TabBarView(
                 children: [
-                  _overviewTab(),
                   _sandboxTab(),
                   _deployTab(),
                   _componentsTab(),
+                  _infoTab(),
                 ],
               ),
             ),
@@ -147,34 +101,7 @@ class _LocalPageState extends State<LocalPage> {
     );
   }
 
-  // ---------- Tab 1 总览 ----------
-
-  Widget _overviewTab() {
-    final running = _status?['running'] == true;
-    final connected = _status?['connected'] == true;
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(20, 12, 20, 40),
-      children: [
-        const Text('LOCAL DEPLOY',
-            style: TextStyle(fontSize: 11, letterSpacing: 2,
-                color: SnowStyle.muted, fontWeight: FontWeight.w700)),
-        const SizedBox(height: 8),
-        const Text('总览',
-            style: TextStyle(fontSize: 30, fontWeight: FontWeight.w800,
-                letterSpacing: -0.8)),
-        const SizedBox(height: 16),
-        _statusBanner(running, connected),
-        const SizedBox(height: 16),
-        _section('连接信息'),
-        _row('服务器地址', appState.baseUrl.isEmpty ? '未连接' : appState.baseUrl),
-        _row('控制面板', 'http://$_host:6199'),
-        _row('AI 网关', 'http://$_host:8090'),
-        _row('QQ 接入', 'ws://$_host:3001'),
-      ],
-    );
-  }
-
-  // ---------- Tab 2 沙盒 ----------
+  // ---------- Tab 1 沙盒 ----------
 
   Widget _sandboxTab() {
     return ListView(
@@ -214,7 +141,7 @@ class _LocalPageState extends State<LocalPage> {
     );
   }
 
-  // ---------- Tab 3 部署 ----------
+  // ---------- Tab 2 部署 ----------
 
   Widget _deployTab() {
     return ListView(
@@ -230,7 +157,8 @@ class _LocalPageState extends State<LocalPage> {
         const SizedBox(height: 16),
         _card(
           '离线包已内置',
-          '安装脚本 + QQBot 程序 + go-cqhttp，导出后到 iOS「文件」App 取用。',
+          '安装脚本 + QQBot 程序 + go-cqhttp + NapCat/AstrBot 部署脚本，'
+          '导出后到 iOS「文件」App 取用。',
           icon: Icons.archive_outlined,
           action: OutlinedButton(
             onPressed: _exporting ? null : _exportOfflinePackage,
@@ -239,10 +167,16 @@ class _LocalPageState extends State<LocalPage> {
         ),
         const SizedBox(height: 10),
         _copyCard(
-          '局域网设备安装',
-          '把离线包拷到 Linux 设备（树莓派/NUC）执行：',
+          '局域网设备一键安装（Linux）',
+          '把离线包拷到树莓派/NUC/旧电脑，一条命令装好 SnowLuma+QQBot：',
           code: 'tar -xzf snowluma-qqbot-offline.tar.gz\n'
               'cd offline && sudo bash install.sh',
+        ),
+        const SizedBox(height: 10),
+        _copyCard(
+          '一键部署 NapCat + AstrBot（Linux）',
+          '在本地 Linux 设备上一条命令部署 QQ 协议端和机器人框架：',
+          code: 'sudo bash install-napcat-astrbot.sh',
         ),
         const SizedBox(height: 10),
         _copyCard(
@@ -252,17 +186,11 @@ class _LocalPageState extends State<LocalPage> {
               'tar -xzf snowluma-qqbot-offline.tar.gz\n'
               'cd offline && sh ish-install.sh',
         ),
-        const SizedBox(height: 10),
-        _copyCard(
-          '一键部署 NapCat + AstrBot（Linux）',
-          '在服务器/树莓派上一条命令部署 QQ 协议端 NapCat 和机器人框架 AstrBot：',
-          code: 'sudo bash install-napcat-astrbot.sh',
-        ),
       ],
     );
   }
 
-  // ---------- Tab 4 组件 ----------
+  // ---------- Tab 3 组件 ----------
 
   Widget _componentsTab() {
     const comps = [
@@ -318,71 +246,58 @@ class _LocalPageState extends State<LocalPage> {
     );
   }
 
-  // ---------- 通用组件 ----------
+  // ---------- Tab 4 说明 ----------
 
-  Widget _statusBanner(bool running, bool connected) {
-    final ok = running && connected;
+  Widget _infoTab() {
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(20, 12, 20, 40),
+      children: [
+        const Text('LOCAL GUIDE',
+            style: TextStyle(fontSize: 11, letterSpacing: 2,
+                color: SnowStyle.muted, fontWeight: FontWeight.w700)),
+        const SizedBox(height: 8),
+        const Text('说明',
+            style: TextStyle(fontSize: 30, fontWeight: FontWeight.w800,
+                letterSpacing: -0.8)),
+        const SizedBox(height: 16),
+        _infoCard('方案一 · iPhone 本机（iSH）',
+            '使用 App 内置沙盒：解压 Alpine rootfs → 安装 Node.js → 启动终端 → '
+            '部署 go-cqhttp 扫码登录。无需任何服务器。\n'
+            '局限：go-cqhttp 为旧协议可能被风控；iOS 会挂起后台 iSH。'),
+        _infoCard('方案二 · 局域网设备',
+            '把 App 导出的离线包拷到树莓派/NUC/旧电脑，运行 install.sh，'
+            '手机通过局域网连接设备上的面板。\n'
+            '这是最稳定的本地部署方式，可跑 NapCat 新协议。'),
+        _infoCard('方案三 · NapCat + AstrBot',
+            '在本地 Linux 设备运行 install-napcat-astrbot.sh，一键部署 '
+            'NapCat（QQ 协议端）+ AstrBot（机器人框架）。'),
+        _infoCard('离线包内容',
+            'install.sh / ish-install.sh / ish-qq-protocol.sh / '
+            'install-napcat-astrbot.sh / qqbot.tar.gz / go-cqhttp / README'),
+      ],
+    );
+  }
+
+  Widget _infoCard(String title, String desc) {
     return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: SnowStyle.card(color: SnowStyle.ink, radius: 24),
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(16),
+      decoration: SnowStyle.card(),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(children: [
-            Container(width: 9, height: 9, decoration: BoxDecoration(
-              color: ok ? const Color(0xFF9BD1B1) : const Color(0xFFB9A795),
-              shape: BoxShape.circle)),
-            const SizedBox(width: 8),
-            const Expanded(child: Text('SERVER STATUS',
-                style: TextStyle(color: Color(0xFFB5B8C2), fontSize: 10,
-                    letterSpacing: 1.4, fontWeight: FontWeight.w700))),
-          ]),
-          const SizedBox(height: 14),
-          const Text('部署状态',
-              style: TextStyle(color: Colors.white, fontSize: 21,
-                  fontWeight: FontWeight.w800)),
-          const SizedBox(height: 6),
-          Text(
-            _checking
-                ? '检查中…'
-                : (_err != null
-                    ? '连接失败：$_err'
-                    : (ok ? '运行中 · QQ 已连接' : (running ? '运行中 · QQ 未连接' : '未运行'))),
-            style: const TextStyle(color: Color(0xFFC5C7CF), fontSize: 12,
-                height: 1.5),
-          ),
+          Text(title,
+              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
+          const SizedBox(height: 5),
+          Text(desc,
+              style: const TextStyle(fontSize: 12.5, color: SnowStyle.muted,
+                  height: 1.5)),
         ],
       ),
     );
   }
 
-  Widget _section(String title) => Padding(
-        padding: const EdgeInsets.fromLTRB(4, 6, 4, 8),
-        child: Text(title,
-            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700,
-                letterSpacing: 1, color: SnowStyle.muted)),
-      );
-
-  Widget _row(String label, String value) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-      decoration: SnowStyle.card(),
-      child: Row(
-        children: [
-          Text(label,
-              style: const TextStyle(fontSize: 12.5, color: SnowStyle.muted)),
-          const SizedBox(width: 12),
-          Expanded(
-            child: SelectableText(value,
-                textAlign: TextAlign.right,
-                style: const TextStyle(fontSize: 12.5,
-                    fontFeatures: SnowStyle.tabular)),
-          ),
-        ],
-      ),
-    );
-  }
+  // ---------- 通用组件 ----------
 
   Widget _card(String title, String desc,
       {required IconData icon, Widget? action}) {
