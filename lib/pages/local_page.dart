@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:archive/archive.dart';
@@ -27,7 +28,10 @@ class _LocalPageState extends State<LocalPage> {
   bool _deploying = false;
   double _deployProgress = 0;
   String _deployStatus = '准备就绪';
+  String _termLog = '';
   _DeployTarget _deployTarget = _DeployTarget.snowlumaQqbot;
+  static const _ish = MethodChannel('snowluma/ish');
+  static const _ishOut = EventChannel('snowluma/ish/output');
 
   void _copy(String text) {
     Clipboard.setData(ClipboardData(text: text));
@@ -72,7 +76,7 @@ class _LocalPageState extends State<LocalPage> {
       _deploying = true;
       _deployProgress = 0;
     });
-    const steps = 6;
+    const steps = 9;
     void setStep(int i, String msg) {
       if (!mounted) return;
       setState(() {
@@ -107,7 +111,40 @@ class _LocalPageState extends State<LocalPage> {
       File('${dir.path}/alpine-rootfs/opt/go-cqhttp/config.yml')
           .writeAsBytesSync(cfgData.buffer.asUint8List(), flush: true);
 
-      setStep(6, 'SnowLuma + QQBot 部署完成！可在「沙盒」启动 Linux。');
+      // ===== 自动启动阶段 =====
+      setStep(7, '正在启动 Linux 沙盒…');
+      final dir2 = await getApplicationDocumentsDirectory();
+      final rootfs = '${dir2.path}/alpine-rootfs';
+      await _ishOut.receiveBroadcastStream().listen((ev) {
+        if (!mounted) return;
+        final t = ev.toString();
+        setState(() => _termLog = (_termLog + t).length > 1200
+            ? (_termLog + t).substring((_termLog + t).length - 1200)
+            : _termLog + t);
+      }, onError: (_) {});
+      await _ish.invokeMethod<void>('start', {
+        'rootfs': rootfs,
+        'exe': '/bin/sh',
+        'envp': 'TERM=xterm\u0000PATH=/usr/bin:/bin:/usr/sbin:/sbin\u0000HOME=/root\u0000\u0000',
+      });
+      await Future<void>.delayed(const Duration(milliseconds: 2500));
+
+      setStep(8, '正在启动 QQBot 服务…');
+      await _ish.invokeMethod<void>('write', {
+        'text': 'export PATH=/usr/bin:/bin:/usr/sbin:/sbin\n'
+                'cd /opt/qqbot && nohup python3 run.py --no-tray > /tmp/qqbot.log 2>&1 &\n'
+                'echo QQBot started\n',
+      });
+      await Future<void>.delayed(const Duration(milliseconds: 1800));
+
+      setStep(9, '正在启动 go-cqhttp 协议端…');
+      await _ish.invokeMethod<void>('write', {
+        'text': 'cd /opt/go-cqhttp && nohup ./go-cqhttp -c config.yml > /tmp/gocq.log 2>&1 &\n'
+                'echo go-cqhttp started\n',
+      });
+      await Future<void>.delayed(const Duration(milliseconds: 1500));
+
+      setStep(9, '✅ 全部自动部署完成！面板 http://127.0.0.1:6199');
       if (mounted) setState(() => _deploying = false);
     } catch (e) {
       if (mounted) {
@@ -238,6 +275,26 @@ class _LocalPageState extends State<LocalPage> {
                 Text(_deployStatus,
                     style: const TextStyle(color: Color(0xFFD6D8DE),
                         fontSize: 12, fontFeatures: SnowStyle.tabular)),
+                if (_termLog.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  Container(
+                    height: 92,
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF0B0C0F),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: SingleChildScrollView(
+                      reverse: true,
+                      child: Text(_termLog,
+                          style: const TextStyle(
+                              color: Color(0xFF7EE787),
+                              fontSize: 10,
+                              height: 1.4,
+                              fontFamily: 'monospace')),
+                    ),
+                  ),
+                ],
               ] else
                 Text(_deployStatus,
                     style: const TextStyle(color: Color(0xFFB5B8C2),
