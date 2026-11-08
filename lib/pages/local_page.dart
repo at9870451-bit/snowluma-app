@@ -8,9 +8,9 @@ import 'package:path_provider/path_provider.dart';
 import '../core/snow_theme.dart';
 import 'ish_sandbox_page.dart';
 
-/// 本地部署 — 完全本地，不依赖服务器。AstrBot 风格顶部 4 Tab：
-///   沙盒：App 内嵌 iSH Linux 沙盒入口
-///   部署：离线包导出 / 局域网设备一键安装 / NapCat+AstrBot
+/// 本地部署 — 完全本地。AstrBot 风格顶部 4 Tab：
+///   沙盒：一键部署（NapCat+AstrBot / SnowLuma+QQBot 单选）+ iSH 沙盒入口
+///   网关：已部署的网关/组件状态与连接信息
 ///   组件：运行环境组件清单
 ///   说明：本地部署流程与限制
 class LocalPage extends StatefulWidget {
@@ -20,11 +20,14 @@ class LocalPage extends StatefulWidget {
   State<LocalPage> createState() => _LocalPageState();
 }
 
+enum _DeployTarget { snowlumaQqbot, napcatAstrbot }
+
 class _LocalPageState extends State<LocalPage> {
   bool _exporting = false;
   bool _deploying = false;
   double _deployProgress = 0;
   String _deployStatus = '准备就绪';
+  _DeployTarget _deployTarget = _DeployTarget.snowlumaQqbot;
 
   void _copy(String text) {
     Clipboard.setData(ClipboardData(text: text));
@@ -32,6 +35,8 @@ class _LocalPageState extends State<LocalPage> {
       ..hideCurrentSnackBar()
       ..showSnackBar(const SnackBar(content: Text('已复制到剪贴板')));
   }
+
+  String get _docRoot => '${Directory.systemTemp.path}/x'; // 占位，实际在方法里取
 
   /// 把内置 asset 的 tar.gz 解压到 Documents/alpine-rootfs 的指定子目录。
   Future<int> _extractAsset(String asset, String targetSubDir) async {
@@ -60,7 +65,7 @@ class _LocalPageState extends State<LocalPage> {
     return n;
   }
 
-  /// 一键部署：依次解压 rootfs、Node.js、Python、QQBot、go-cqhttp。
+  /// SnowLuma + QQBot 一键部署（iOS 沙盒内完成）。
   Future<void> _deployAll() async {
     if (_deploying) return;
     setState(() {
@@ -102,7 +107,7 @@ class _LocalPageState extends State<LocalPage> {
       File('${dir.path}/alpine-rootfs/opt/go-cqhttp/config.yml')
           .writeAsBytesSync(cfgData.buffer.asUint8List(), flush: true);
 
-      setStep(6, '全部部署完成！可在「沙盒」中启动 Linux 终端。');
+      setStep(6, 'SnowLuma + QQBot 部署完成！可在「沙盒」启动 Linux。');
       if (mounted) setState(() => _deploying = false);
     } catch (e) {
       if (mounted) {
@@ -114,22 +119,21 @@ class _LocalPageState extends State<LocalPage> {
     }
   }
 
-  Future<void> _exportOfflinePackage() async {
+  /// NapCat + AstrBot：把脚本导出到本机，复制一键命令（在 Linux 设备执行）。
+  Future<void> _prepareNapcatAstrbot() async {
     if (_exporting) return;
     setState(() => _exporting = true);
     try {
-      final data = await rootBundle
-          .load('assets/offline/snowluma-qqbot-offline.tar.gz');
+      final scriptData = await rootBundle
+          .load('assets/offline/install-napcat-astrbot.sh');
       final dir = await getApplicationDocumentsDirectory();
-      final file = File('${dir.path}/snowluma-qqbot-offline.tar.gz');
-      await file.writeAsBytes(data.buffer.asUint8List(), flush: true);
+      final f = File('${dir.path}/install-napcat-astrbot.sh');
+      await f.writeAsBytes(scriptData.buffer.asUint8List(), flush: true);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('已导出（${(data.lengthInBytes / 1024 / 1024).toStringAsFixed(1)} MB）到「文件」App'),
-          duration: const Duration(seconds: 4),
-        ),
+        const SnackBar(content: Text('脚本已导出到「文件」App，请拷到 Linux 设备执行。')),
       );
+      _copy('sudo bash install-napcat-astrbot.sh');
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context)
@@ -161,7 +165,7 @@ class _LocalPageState extends State<LocalPage> {
             dividerColor: Colors.transparent,
             tabs: [
               Tab(text: '沙盒'),
-              Tab(text: '部署'),
+              Tab(text: '网关'),
               Tab(text: '组件'),
               Tab(text: '说明'),
             ],
@@ -174,7 +178,7 @@ class _LocalPageState extends State<LocalPage> {
               child: TabBarView(
                 children: [
                   _sandboxTab(),
-                  _deployTab(),
+                  _gatewayTab(),
                   _componentsTab(),
                   _infoTab(),
                 ],
@@ -192,17 +196,13 @@ class _LocalPageState extends State<LocalPage> {
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 12, 20, 40),
       children: [
-        const Text('ISH SANDBOX',
+        const Text('ONE-CLICK DEPLOY',
             style: TextStyle(fontSize: 11, letterSpacing: 2,
                 color: SnowStyle.muted, fontWeight: FontWeight.w700)),
         const SizedBox(height: 8),
         const Text('沙盒',
             style: TextStyle(fontSize: 30, fontWeight: FontWeight.w800,
                 letterSpacing: -0.8)),
-        const SizedBox(height: 6),
-        const Text('App 内嵌 iSH Linux 沙盒：解压 Alpine rootfs、安装 Node.js、'
-            '启动可交互终端、部署 go-cqhttp 协议端。',
-            style: TextStyle(color: SnowStyle.muted, fontSize: 13, height: 1.5)),
         const SizedBox(height: 16),
         // 一键部署卡片
         Container(
@@ -211,14 +211,22 @@ class _LocalPageState extends State<LocalPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const Text('一键部署本地机器人',
+              const Text('一键部署',
                   style: TextStyle(color: Colors.white, fontSize: 18,
                       fontWeight: FontWeight.w800)),
-              const SizedBox(height: 6),
-              const Text('自动完成：rootfs → Node.js → Python → QQBot → go-cqhttp',
-                  style: TextStyle(color: Color(0xFFB5B8C2), fontSize: 12,
-                      height: 1.4)),
-              const SizedBox(height: 14),
+              const SizedBox(height: 8),
+              _targetRadio(
+                value: _DeployTarget.snowlumaQqbot,
+                title: 'SnowLuma + QQBot',
+                desc: '在 iPhone 沙盒内完成：rootfs + Node + Python + QQBot + go-cqhttp',
+              ),
+              const SizedBox(height: 8),
+              _targetRadio(
+                value: _DeployTarget.napcatAstrbot,
+                title: 'NapCat + AstrBot',
+                desc: '导出部署脚本，在本地 Linux 设备一键部署协议端与机器人框架',
+              ),
+              const SizedBox(height: 12),
               if (_deploying) ...[
                 LinearProgressIndicator(
                   value: _deployProgress,
@@ -236,87 +244,159 @@ class _LocalPageState extends State<LocalPage> {
                         fontSize: 12)),
               const SizedBox(height: 14),
               FilledButton.icon(
-                onPressed: _deploying ? null : _deployAll,
+                onPressed: _deploying
+                    ? null
+                    : (_deployTarget == _DeployTarget.snowlumaQqbot
+                        ? _deployAll
+                        : _prepareNapcatAstrbot),
                 icon: _deploying
                     ? const SizedBox(
                         width: 16, height: 16,
                         child: CircularProgressIndicator(strokeWidth: 2,
                             color: Colors.white))
-                    : const Icon(Icons.rocket_launch_rounded),
-                label: Text(_deploying ? '部署中…' : '开始一键部署'),
+                    : Icon(_deployTarget == _DeployTarget.snowlumaQqbot
+                        ? Icons.rocket_launch_rounded
+                        : Icons.terminal_rounded),
+                label: Text(
+                    _deploying
+                        ? '部署中…'
+                        : (_deployTarget == _DeployTarget.snowlumaQqbot
+                            ? '开始一键部署'
+                            : '导出并复制命令'),
+                ),
               ),
             ],
           ),
         ),
         const SizedBox(height: 12),
         _card(
-          'iSH 沙盒',
-          '内置 Alpine rootfs + Node.js + go-cqhttp 协议端，iPhone 本地跑 Linux。',
+          'iSH 沙盒终端',
+          '部署完成后打开终端，启动 Linux 并运行脚本。',
           icon: Icons.terminal_rounded,
           action: FilledButton(
             onPressed: () => openIshSandbox(context),
             child: const Text('打开沙盒'),
           ),
         ),
-        const SizedBox(height: 10),
-        _copyCard(
-          '部署协议端（沙盒终端内）',
-          '在 iSH 沙盒里执行以下步骤启动 QQ 协议端：',
-          code: 'sh /opt/go-cqhttp/ish-qq-protocol.sh',
-        ),
-        const SizedBox(height: 8),
-        const Text('限制：go-cqhttp 为旧版协议，可能被风控；iOS 会挂起后台 iSH。',
-            style: TextStyle(fontSize: 11, color: SnowStyle.muted, height: 1.5)),
       ],
     );
   }
 
-  // ---------- Tab 2 部署 ----------
-
-  Widget _deployTab() {
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(20, 12, 20, 40),
-      children: [
-        const Text('OFFLINE DEPLOY',
-            style: TextStyle(fontSize: 11, letterSpacing: 2,
-                color: SnowStyle.muted, fontWeight: FontWeight.w700)),
-        const SizedBox(height: 8),
-        const Text('部署',
-            style: TextStyle(fontSize: 30, fontWeight: FontWeight.w800,
-                letterSpacing: -0.8)),
-        const SizedBox(height: 16),
-        _card(
-          '离线包已内置',
-          '安装脚本 + QQBot 程序 + go-cqhttp + NapCat/AstrBot 部署脚本，'
-          '导出后到 iOS「文件」App 取用。',
-          icon: Icons.archive_outlined,
-          action: OutlinedButton(
-            onPressed: _exporting ? null : _exportOfflinePackage,
-            child: Text(_exporting ? '导出中…' : '导出'),
+  Widget _targetRadio(_DeployTarget value, {required String title, required String desc}) {
+    final selected = _deployTarget == value;
+    return InkWell(
+      borderRadius: BorderRadius.circular(14),
+      onTap: () => setState(() => _deployTarget = value),
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: selected ? const Color(0xFF2E3038) : const Color(0xFF1E1F24),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: selected ? const Color(0xFF4ADE80) : const Color(0xFF33353D),
+            width: 1.2,
           ),
         ),
-        const SizedBox(height: 10),
-        _copyCard(
-          '局域网设备一键安装（Linux）',
-          '把离线包拷到树莓派/NUC/旧电脑，一条命令装好 SnowLuma+QQBot：',
-          code: 'tar -xzf snowluma-qqbot-offline.tar.gz\n'
-              'cd offline && sudo bash install.sh',
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(
+              selected
+                  ? Icons.radio_button_checked
+                  : Icons.radio_button_off,
+              color: selected ? const Color(0xFF4ADE80) : const Color(0xFF8B8F9A),
+              size: 20,
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title,
+                      style: const TextStyle(color: Colors.white,
+                          fontSize: 14, fontWeight: FontWeight.w700)),
+                  const SizedBox(height: 3),
+                  Text(desc,
+                      style: const TextStyle(color: Color(0xFFB5B8C2),
+                          fontSize: 11.5, height: 1.4)),
+                ],
+              ),
+            ),
+          ],
         ),
-        const SizedBox(height: 10),
-        _copyCard(
-          '一键部署 NapCat + AstrBot（Linux）',
-          '在本地 Linux 设备上一条命令部署 QQ 协议端和机器人框架：',
-          code: 'sudo bash install-napcat-astrbot.sh',
-        ),
-        const SizedBox(height: 10),
-        _copyCard(
-          'iSH（iPhone）安装',
-          '在 iSH 里解压并运行安装脚本：',
-          code: 'cd /mnt/你的离线包目录\n'
-              'tar -xzf snowluma-qqbot-offline.tar.gz\n'
-              'cd offline && sh ish-install.sh',
-        ),
-      ],
+      ),
+    );
+  }
+
+  // ---------- Tab 2 网关 ----------
+
+  Widget _gatewayTab() {
+    return FutureBuilder<Map<String, bool>>(
+      future: _checkInstalled(),
+      builder: (context, snap) {
+        final data = snap.data ?? {};
+        return ListView(
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 40),
+          children: [
+            const Text('DEPLOYED GATEWAY',
+                style: TextStyle(fontSize: 11, letterSpacing: 2,
+                    color: SnowStyle.muted, fontWeight: FontWeight.w700)),
+            const SizedBox(height: 8),
+            const Text('已部署网关',
+                style: TextStyle(fontSize: 30, fontWeight: FontWeight.w800,
+                    letterSpacing: -0.8)),
+            const SizedBox(height: 6),
+            const Text('沙盒中已安装的组件与连接信息。',
+                style: TextStyle(color: SnowStyle.muted, fontSize: 13, height: 1.5)),
+            const SizedBox(height: 16),
+            _statusRow('Alpine rootfs', data['rootfs'] == true),
+            _statusRow('Node.js', data['node'] == true),
+            _statusRow('Python', data['python'] == true),
+            _statusRow('QQBot', data['qqbot'] == true),
+            _statusRow('go-cqhttp', data['gocqhttp'] == true),
+            const SizedBox(height: 12),
+            _section('连接信息（沙盒内）'),
+            _row('QQ 协议端 WS', 'ws://127.0.0.1:3001'),
+            _row('HTTP 协议端', 'http://127.0.0.1:5700'),
+            _row('QQBot 面板', 'http://127.0.0.1:6199'),
+          ],
+        );
+      },
+    );
+  }
+
+  Future<Map<String, bool>> _checkInstalled() async {
+    final dir = await getApplicationDocumentsDirectory();
+    final root = '${dir.path}/alpine-rootfs';
+    return {
+      'rootfs': Directory(root).existsSync(),
+      'node': File('$root/usr/bin/node').existsSync(),
+      'python': File('$root/usr/bin/python3').existsSync(),
+      'qqbot': Directory('$root/opt/qqbot').existsSync(),
+      'gocqhttp': File('$root/opt/go-cqhttp/go-cqhttp').existsSync() ||
+          Directory('$root/opt/go-cqhttp').existsSync(),
+    };
+  }
+
+  Widget _statusRow(String label, bool ok) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
+      decoration: SnowStyle.card(),
+      child: Row(
+        children: [
+          Icon(ok ? Icons.check_circle_rounded : Icons.radio_button_unchecked,
+              size: 19,
+              color: ok ? const Color(0xFF34C759) : const Color(0xFFC7C7CC)),
+          const SizedBox(width: 10),
+          Text(label,
+              style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600)),
+          const Spacer(),
+          Text(ok ? '已就绪' : '未安装',
+              style: TextStyle(fontSize: 11.5,
+                  color: ok ? const Color(0xFF34C759) : const Color(0xFF9A9FA8))),
+        ],
+      ),
     );
   }
 
@@ -326,7 +406,7 @@ class _LocalPageState extends State<LocalPage> {
     const comps = [
       ('BusyBox', '通用 Unix 工具箱', '沙盒 bin/'),
       ('musl', '轻量 C 库', '静态链接'),
-      ('Python', 'QQBot 运行环境', 'usr/bin/python3'),
+      ('Python', '已内置', 'usr/bin/python3'),
       ('Node.js', '已内置 v20.15.1', 'usr/bin/node'),
       ('OpenSSL', '证书/HTTPS', 'usr/bin/openssl'),
       ('Git', '版本管理', 'usr/bin/git'),
@@ -391,16 +471,11 @@ class _LocalPageState extends State<LocalPage> {
                 letterSpacing: -0.8)),
         const SizedBox(height: 16),
         _infoCard('方案一 · iPhone 本机（iSH）',
-            '使用 App 内置沙盒：解压 Alpine rootfs → 安装 Node.js → 启动终端 → '
-            '部署 go-cqhttp 扫码登录。无需任何服务器。\n'
-            '局限：go-cqhttp 为旧协议可能被风控；iOS 会挂起后台 iSH。'),
-        _infoCard('方案二 · 局域网设备',
-            '把 App 导出的离线包拷到树莓派/NUC/旧电脑，运行 install.sh，'
-            '手机通过局域网连接设备上的面板。\n'
-            '这是最稳定的本地部署方式，可跑 NapCat 新协议。'),
-        _infoCard('方案三 · NapCat + AstrBot',
-            '在本地 Linux 设备运行 install-napcat-astrbot.sh，一键部署 '
-            'NapCat（QQ 协议端）+ AstrBot（机器人框架）。'),
+            '一键部署 SnowLuma + QQBot：rootfs + Node + Python + QQBot + go-cqhttp，'
+            '全部在沙盒内完成。局限：go-cqhttp 旧协议可能被风控；iOS 会挂起后台。'),
+        _infoCard('方案二 · 本地 Linux 设备',
+            '选择 NapCat + AstrBot，导出脚本到 Linux 设备执行 '
+            'sudo bash install-napcat-astrbot.sh，一键部署协议端与机器人框架。'),
         _infoCard('离线包内容',
             'install.sh / ish-install.sh / ish-qq-protocol.sh / '
             'install-napcat-astrbot.sh / qqbot.tar.gz / go-cqhttp / README'),
@@ -428,6 +503,34 @@ class _LocalPageState extends State<LocalPage> {
   }
 
   // ---------- 通用组件 ----------
+
+  Widget _section(String title) => Padding(
+        padding: const EdgeInsets.fromLTRB(4, 6, 4, 8),
+        child: Text(title,
+            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700,
+                letterSpacing: 1, color: SnowStyle.muted)),
+      );
+
+  Widget _row(String label, String value) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      decoration: SnowStyle.card(),
+      child: Row(
+        children: [
+          Text(label,
+              style: const TextStyle(fontSize: 12.5, color: SnowStyle.muted)),
+          const SizedBox(width: 12),
+          Expanded(
+            child: SelectableText(value,
+                textAlign: TextAlign.right,
+                style: const TextStyle(fontSize: 12.5,
+                    fontFeatures: SnowStyle.tabular)),
+          ),
+        ],
+      ),
+    );
+  }
 
   Widget _card(String title, String desc,
       {required IconData icon, Widget? action}) {
@@ -459,48 +562,6 @@ class _LocalPageState extends State<LocalPage> {
             ),
           ),
           if (action != null) ...[const SizedBox(width: 8), action],
-        ],
-      ),
-    );
-  }
-
-  Widget _copyCard(String title, String desc, {required String code}) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.fromLTRB(16, 14, 10, 14),
-      decoration: SnowStyle.card(),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(title,
-                    style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
-                const SizedBox(height: 4),
-                Text(desc,
-                    style: const TextStyle(fontSize: 12, color: SnowStyle.muted,
-                        height: 1.5)),
-                const SizedBox(height: 8),
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                      color: const Color(0xFFF1F2F5),
-                      borderRadius: BorderRadius.circular(10)),
-                  child: SelectableText(code,
-                      style: const TextStyle(
-                          fontFamily: 'Menlo', fontSize: 11, height: 1.5)),
-                ),
-              ],
-            ),
-          ),
-          IconButton(
-            tooltip: '复制命令',
-            onPressed: () => _copy(code),
-            icon: const Icon(Icons.copy_rounded, size: 18),
-          ),
         ],
       ),
     );
