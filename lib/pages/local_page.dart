@@ -422,6 +422,12 @@ class _LocalPageState extends State<LocalPage> {
               icon: const Icon(Icons.link_rounded, size: 16),
               label: const Text('复制面板地址'),
             ),
+            const SizedBox(height: 8),
+            OutlinedButton.icon(
+              onPressed: _diagnose,
+              icon: const Icon(Icons.troubleshoot_rounded, size: 16),
+              label: const Text('诊断服务（查看终端输出）'),
+            ),
             const SizedBox(height: 16),
             _statusRow('Alpine rootfs', data['rootfs'] == true),
             _statusRow('Node.js', data['node'] == true),
@@ -443,6 +449,65 @@ class _LocalPageState extends State<LocalPage> {
     Navigator.of(context).push(MaterialPageRoute<void>(
       builder: (_) => const LocalPanelPage(),
     ));
+  }
+
+  /// 诊断：启动沙盒并执行检查命令，把终端输出显示出来。
+  Future<void> _diagnose() async {
+    final buf = StringBuffer();
+    StreamSubscription<dynamic>? sub;
+    try {
+      sub = _ishOut.receiveBroadcastStream().listen((ev) {
+        buf.write(ev);
+      }, onError: (_) {});
+      final dir = await getApplicationDocumentsDirectory();
+      final rootfs = '${dir.path}/alpine-rootfs';
+      try {
+        await _ish.invokeMethod<void>('start', {
+          'rootfs': rootfs,
+          'exe': '/bin/sh',
+          'envp': 'TERM=xterm\\u0000PATH=/usr/bin:/bin:/usr/sbin:/sbin\\u0000HOME=/root\\u0000\\u0000',
+        });
+      } catch (_) {
+        // 已启动会抛错，忽略
+      }
+      await Future<void>.delayed(const Duration(seconds: 2));
+      await _ish.invokeMethod<void>('write', {
+        'text': 'export PATH=/usr/bin:/bin:/usr/sbin:/sbin\\n'
+                'echo ===== python =====\\n'
+                'python3 --version 2>&1\\n'
+                'echo ===== qqbot =====\\n'
+                'ls /opt/qqbot 2>&1 | head -10\\n'
+                'echo ===== run =====\\n'
+                'cd /opt/qqbot && timeout 8 python3 run.py --no-tray 2>&1 | head -25\\n'
+                'echo ===== 6199 =====\\n'
+                'netstat -ltn 2>/dev/null | grep 6199 || echo "6199 未监听"\\n',
+      });
+      await Future<void>.delayed(const Duration(seconds: 12));
+    } catch (e) {
+      buf.write('\n[诊断异常] $e');
+    } finally {
+      await sub?.cancel();
+    }
+    if (!mounted) return;
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('服务诊断'),
+        content: SingleChildScrollView(
+          child: SelectableText(
+            buf.isEmpty ? '（无输出）' : buf.toString(),
+            style: const TextStyle(fontSize: 11, fontFamily: 'monospace',
+                height: 1.4),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('关闭'),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<Map<String, bool>> _checkInstalled() async {
