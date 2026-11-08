@@ -8,6 +8,7 @@ import 'package:path_provider/path_provider.dart';
 
 import '../core/snow_theme.dart';
 import 'ish_sandbox_page.dart';
+import 'local_panel_page.dart';
 
 /// 本地部署 — 完全本地。AstrBot 风格顶部 4 Tab：
 ///   沙盒：一键部署（NapCat+AstrBot / SnowLuma+QQBot 单选）+ iSH 沙盒入口
@@ -406,6 +407,22 @@ class _LocalPageState extends State<LocalPage> {
             const Text('沙盒中已安装的组件与连接信息。',
                 style: TextStyle(color: SnowStyle.muted, fontSize: 13, height: 1.5)),
             const SizedBox(height: 16),
+            FilledButton.icon(
+              onPressed: _openPanel,
+              icon: const Icon(Icons.open_in_new_rounded, size: 18),
+              label: const Text('打开本地面板（127.0.0.1:6199）'),
+              style: FilledButton.styleFrom(
+                minimumSize: const Size.fromHeight(46),
+                backgroundColor: SnowStyle.ink,
+              ),
+            ),
+            const SizedBox(height: 8),
+            OutlinedButton.icon(
+              onPressed: () => _copy('http://127.0.0.1:6199'),
+              icon: const Icon(Icons.link_rounded, size: 16),
+              label: const Text('复制面板地址'),
+            ),
+            const SizedBox(height: 16),
             _statusRow('Alpine rootfs', data['rootfs'] == true),
             _statusRow('Node.js', data['node'] == true),
             _statusRow('Python', data['python'] == true),
@@ -420,6 +437,12 @@ class _LocalPageState extends State<LocalPage> {
         );
       },
     );
+  }
+
+  void _openPanel() {
+    Navigator.of(context).push(MaterialPageRoute<void>(
+      builder: (_) => const LocalPanelPage(),
+    ));
   }
 
   Future<Map<String, bool>> _checkInstalled() async {
