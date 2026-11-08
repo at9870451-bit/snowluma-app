@@ -111,7 +111,10 @@ class _IshSandboxPageState extends State<IshSandboxPage> {
         if (name.isEmpty) continue;
         final target = File('${rootfsDir.path}/$name');
         if (file.isSymbolicLink) {
-          final linkTarget = String.fromCharCodes(file.content as List<int>);
+          final _raw = file.content;
+        final linkTarget = _raw is String
+            ? _raw
+            : String.fromCharCodes(_raw as List<int>);
           target.parent.createSync(recursive: true);
           try {
             Link(target.path).createSync(linkTarget);
@@ -125,6 +128,8 @@ class _IshSandboxPageState extends State<IshSandboxPage> {
           Directory(target.path).createSync(recursive: true);
         }
       }
+      // iSH fakefs 需要 meta.db 预先存在（SQLITE_OPEN_READWRITE 不会自动创建）
+      File('${_rootfs}/meta.db').createSync(recursive: true);
       if (!mounted) return;
       setState(() {
         _rootfsState = '已就绪（$n 文件）';
@@ -193,7 +198,10 @@ class _IshSandboxPageState extends State<IshSandboxPage> {
         if (name.isEmpty) continue;
         final target = File('${rootfsDir.path}/$name');
         if (file.isSymbolicLink) {
-          final linkTarget = String.fromCharCodes(file.content as List<int>);
+          final _raw = file.content;
+        final linkTarget = _raw is String
+            ? _raw
+            : String.fromCharCodes(_raw as List<int>);
           target.parent.createSync(recursive: true);
           try {
             Link(target.path).createSync(linkTarget);
@@ -248,7 +256,10 @@ class _IshSandboxPageState extends State<IshSandboxPage> {
         if (name.isEmpty) continue;
         final target = File('${rootfsDir.path}/$name');
         if (file.isSymbolicLink) {
-          final linkTarget = String.fromCharCodes(file.content as List<int>);
+          final _raw = file.content;
+        final linkTarget = _raw is String
+            ? _raw
+            : String.fromCharCodes(_raw as List<int>);
           target.parent.createSync(recursive: true);
           try {
             Link(target.path).createSync(linkTarget);
@@ -305,7 +316,10 @@ class _IshSandboxPageState extends State<IshSandboxPage> {
         if (name.isEmpty) continue;
         final target = File('${outDir.path}/$name');
         if (file.isSymbolicLink) {
-          final linkTarget = String.fromCharCodes(file.content as List<int>);
+          final _raw = file.content;
+        final linkTarget = _raw is String
+            ? _raw
+            : String.fromCharCodes(_raw as List<int>);
           target.parent.createSync(recursive: true);
           try {
             Link(target.path).createSync(linkTarget);
@@ -377,7 +391,10 @@ class _IshSandboxPageState extends State<IshSandboxPage> {
         if (name.isEmpty) continue;
         final target = File('${outDir.path}/$name');
         if (file.isSymbolicLink) {
-          final linkTarget = String.fromCharCodes(file.content as List<int>);
+          final _raw = file.content;
+        final linkTarget = _raw is String
+            ? _raw
+            : String.fromCharCodes(_raw as List<int>);
           target.parent.createSync(recursive: true);
           try {
             Link(target.path).createSync(linkTarget);

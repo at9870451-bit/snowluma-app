@@ -69,7 +69,10 @@ class _LocalPageState extends State<LocalPage> {
       if (name.isEmpty) continue;
       final f = File('${target.path}/$name');
       if (file.isSymbolicLink) {
-        final linkTarget = String.fromCharCodes(file.content as List<int>);
+        final _raw = file.content;
+        final linkTarget = _raw is String
+            ? _raw
+            : String.fromCharCodes(_raw as List<int>);
         f.parent.createSync(recursive: true);
         try {
           Link(f.path).createSync(linkTarget);
@@ -105,6 +108,10 @@ class _LocalPageState extends State<LocalPage> {
     try {
       setStep(1, '正在解压 Alpine rootfs…');
       await _extractAsset('assets/rootfs/alpine-minirootfs.tar.gz', '.');
+      // iSH fakefs 需要 meta.db 预先存在（SQLITE_OPEN_READWRITE 不会自动创建）
+      final _mbDir = await getApplicationDocumentsDirectory();
+      File('${_mbDir.path}/alpine-rootfs/meta.db')
+          .createSync(recursive: true);
 
       setStep(2, '正在安装 Node.js…');
       await _extractAsset('assets/protocol/nodejs-alpine-x86.tar.gz', 'usr');
