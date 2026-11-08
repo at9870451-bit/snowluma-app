@@ -46,7 +46,16 @@ class _LocalPageState extends State<LocalPage> {
   /// 把内置 asset 的 tar.gz 解压到 Documents/alpine-rootfs 的指定子目录。
   Future<int> _extractAsset(String asset, String targetSubDir) async {
     final dir = await getApplicationDocumentsDirectory();
-    final target = Directory('${dir.path}/alpine-rootfs/$targetSubDir');
+    // 解压 Alpine rootfs 前：清理旧的坏解压（旧版本把符号链接写成了空文件）
+    if (asset.contains('alpine-minirootfs')) {
+      final busybox = File('${dir.path}/alpine-rootfs/data/bin/busybox');
+      final rootDir = Directory('${dir.path}/alpine-rootfs');
+      if (rootDir.existsSync() &&
+          (!busybox.existsSync() || busybox.lengthSync() < 1024)) {
+        rootDir.deleteSync(recursive: true);
+      }
+    }
+    final target = Directory('${dir.path}/alpine-rootfs/data/$targetSubDir');
     target.createSync(recursive: true);
     final data = await rootBundle.load(asset);
     final tar = TarDecoder()
@@ -59,7 +68,14 @@ class _LocalPageState extends State<LocalPage> {
       if (name.startsWith('/')) name = name.substring(1);
       if (name.isEmpty) continue;
       final f = File('${target.path}/$name');
-      if (file.isFile) {
+      if (file.isSymbolicLink) {
+        final linkTarget = String.fromCharCodes(file.content as List<int>);
+        f.parent.createSync(recursive: true);
+        try {
+          Link(f.path).createSync(linkTarget);
+        } catch (_) {}
+        n++;
+      } else if (file.isFile) {
         f.parent.createSync(recursive: true);
         f.writeAsBytesSync(file.content as List<int>);
         n++;
@@ -107,9 +123,9 @@ class _LocalPageState extends State<LocalPage> {
       final cfgData = await rootBundle
           .load('assets/protocol/go-cqhttp-config.yml');
       final dir = await getApplicationDocumentsDirectory();
-      File('${dir.path}/alpine-rootfs/opt/go-cqhttp/ish-qq-protocol.sh')
+      File('${dir.path}/alpine-rootfs/data/opt/go-cqhttp/ish-qq-protocol.sh')
           .writeAsBytesSync(scriptData.buffer.asUint8List(), flush: true);
-      File('${dir.path}/alpine-rootfs/opt/go-cqhttp/config.yml')
+      File('${dir.path}/alpine-rootfs/data/opt/go-cqhttp/config.yml')
           .writeAsBytesSync(cfgData.buffer.asUint8List(), flush: true);
 
       // ===== 自动启动阶段 =====
@@ -512,7 +528,7 @@ class _LocalPageState extends State<LocalPage> {
 
   Future<Map<String, bool>> _checkInstalled() async {
     final dir = await getApplicationDocumentsDirectory();
-    final root = '${dir.path}/alpine-rootfs';
+    final root = '${dir.path}/alpine-rootfs/data';
     return {
       'rootfs': Directory(root).existsSync(),
       'node': File('$root/usr/bin/node').existsSync(),

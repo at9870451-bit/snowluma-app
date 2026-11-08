@@ -27,6 +27,8 @@ class _IshSandboxPageState extends State<IshSandboxPage> {
   bool _preparing = false;
   bool _starting = false;
   String _rootfs = '';
+  /// iSH fakefs 的根：-f <rootfs> 实际挂载的是 <rootfs>/data
+  String get _rootfsData => '$_rootfs/data';
   String _rootfsState = '检查中…';
   String _term = '等待操作…\n> ';
   final _termController = ScrollController();
@@ -55,7 +57,7 @@ class _IshSandboxPageState extends State<IshSandboxPage> {
     if (!mounted) return;
     setState(() {
       _rootfs = rootfs;
-      _rootfsState = Directory(rootfs).existsSync()
+      _rootfsState = Directory('$rootfs/data').existsSync()
           ? '已就绪'
           : '未解压（点「解压 rootfs」）';
     });
@@ -98,7 +100,7 @@ class _IshSandboxPageState extends State<IshSandboxPage> {
       final bytes = data.buffer.asUint8List();
       final tar = TarDecoder()
           .decodeBytes(GZipDecoder().decodeBytes(bytes));
-      final rootfsDir = Directory(_rootfs);
+      final rootfsDir = Directory(_rootfsData);
       rootfsDir.createSync(recursive: true);
       int n = 0;
       for (final file in tar) {
@@ -108,7 +110,14 @@ class _IshSandboxPageState extends State<IshSandboxPage> {
         if (name.startsWith('/')) name = name.substring(1);
         if (name.isEmpty) continue;
         final target = File('${rootfsDir.path}/$name');
-        if (file.isFile) {
+        if (file.isSymbolicLink) {
+          final linkTarget = String.fromCharCodes(file.content as List<int>);
+          target.parent.createSync(recursive: true);
+          try {
+            Link(target.path).createSync(linkTarget);
+          } catch (_) {}
+          n++;
+        } else if (file.isFile) {
           target.parent.createSync(recursive: true);
           target.writeAsBytesSync(file.content as List<int>);
           n++;
@@ -170,7 +179,7 @@ class _IshSandboxPageState extends State<IshSandboxPage> {
       _term += '正在安装 Node.js…\n';
     });
     try {
-      final rootfsDir = Directory(_rootfs);
+      final rootfsDir = Directory(_rootfsData);
       final data = await rootBundle
           .load('assets/protocol/nodejs-alpine-x86.tar.gz');
       final tar = TarDecoder()
@@ -183,7 +192,14 @@ class _IshSandboxPageState extends State<IshSandboxPage> {
         if (name.startsWith('/')) name = name.substring(1);
         if (name.isEmpty) continue;
         final target = File('${rootfsDir.path}/$name');
-        if (file.isFile) {
+        if (file.isSymbolicLink) {
+          final linkTarget = String.fromCharCodes(file.content as List<int>);
+          target.parent.createSync(recursive: true);
+          try {
+            Link(target.path).createSync(linkTarget);
+          } catch (_) {}
+          n++;
+        } else if (file.isFile) {
           target.parent.createSync(recursive: true);
           target.writeAsBytesSync(file.content as List<int>);
           n++;
@@ -218,7 +234,7 @@ class _IshSandboxPageState extends State<IshSandboxPage> {
       _term += '正在安装 Python 环境…\n';
     });
     try {
-      final rootfsDir = Directory(_rootfs);
+      final rootfsDir = Directory(_rootfsData);
       final data = await rootBundle
           .load('assets/protocol/python-alpine-x86.tar.gz');
       final tar = TarDecoder()
@@ -231,7 +247,14 @@ class _IshSandboxPageState extends State<IshSandboxPage> {
         if (name.startsWith('/')) name = name.substring(1);
         if (name.isEmpty) continue;
         final target = File('${rootfsDir.path}/$name');
-        if (file.isFile) {
+        if (file.isSymbolicLink) {
+          final linkTarget = String.fromCharCodes(file.content as List<int>);
+          target.parent.createSync(recursive: true);
+          try {
+            Link(target.path).createSync(linkTarget);
+          } catch (_) {}
+          n++;
+        } else if (file.isFile) {
           target.parent.createSync(recursive: true);
           target.writeAsBytesSync(file.content as List<int>);
           n++;
@@ -266,7 +289,7 @@ class _IshSandboxPageState extends State<IshSandboxPage> {
       _term += '正在安装 QQBot 程序…\n';
     });
     try {
-      final rootfsDir = Directory(_rootfs);
+      final rootfsDir = Directory(_rootfsData);
       final outDir = Directory('${rootfsDir.path}/opt/qqbot');
       outDir.createSync(recursive: true);
       final data = await rootBundle
@@ -281,7 +304,14 @@ class _IshSandboxPageState extends State<IshSandboxPage> {
         if (name.startsWith('/')) name = name.substring(1);
         if (name.isEmpty) continue;
         final target = File('${outDir.path}/$name');
-        if (file.isFile) {
+        if (file.isSymbolicLink) {
+          final linkTarget = String.fromCharCodes(file.content as List<int>);
+          target.parent.createSync(recursive: true);
+          try {
+            Link(target.path).createSync(linkTarget);
+          } catch (_) {}
+          n++;
+        } else if (file.isFile) {
           target.parent.createSync(recursive: true);
           target.writeAsBytesSync(file.content as List<int>);
           n++;
@@ -330,7 +360,7 @@ class _IshSandboxPageState extends State<IshSandboxPage> {
       _term += '正在部署 go-cqhttp 协议端…\n';
     });
     try {
-      final rootfsDir = Directory(_rootfs);
+      final rootfsDir = Directory(_rootfsData);
       final outDir = Directory('${rootfsDir.path}/opt/go-cqhttp');
       outDir.createSync(recursive: true);
 
@@ -346,7 +376,14 @@ class _IshSandboxPageState extends State<IshSandboxPage> {
         if (name.startsWith('/')) name = name.substring(1);
         if (name.isEmpty) continue;
         final target = File('${outDir.path}/$name');
-        if (file.isFile) {
+        if (file.isSymbolicLink) {
+          final linkTarget = String.fromCharCodes(file.content as List<int>);
+          target.parent.createSync(recursive: true);
+          try {
+            Link(target.path).createSync(linkTarget);
+          } catch (_) {}
+          n++;
+        } else if (file.isFile) {
           target.parent.createSync(recursive: true);
           target.writeAsBytesSync(file.content as List<int>);
           n++;
