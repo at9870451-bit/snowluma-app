@@ -34,7 +34,7 @@ class _LocalPanelPageState extends State<LocalPanelPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: SnowStyle.canvas,
+      backgroundColor: SnowStyle.background,
       appBar: AppBar(
         title: const Text('本地面板'),
         actions: [
