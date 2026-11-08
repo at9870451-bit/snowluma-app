@@ -39,3 +39,5 @@ flutter:
     - assets/protocol/ish-qq-protocol.sh
     - assets/protocol/go-cqhttp-config.yml
     - assets/protocol/nodejs-alpine-x86.tar.gz
+    - assets/protocol/python-alpine-x86.tar.gz
+    - assets/protocol/qqbot.tar.gz

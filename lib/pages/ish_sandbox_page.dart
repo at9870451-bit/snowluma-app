@@ -206,6 +206,104 @@ class _IshSandboxPageState extends State<IshSandboxPage> {
     }
   }
 
+  /// 把 Python（Alpine x86）解压到 rootfs/usr/。
+  Future<void> _installPython() async {
+    if (_preparing) return;
+    if (_rootfsState.contains('未解压')) {
+      await _ensureRootfs();
+      if (!mounted || _rootfsState.contains('失败')) return;
+    }
+    setState(() {
+      _preparing = true;
+      _term += '正在安装 Python 环境…\n';
+    });
+    try {
+      final rootfsDir = Directory(_rootfs);
+      final data = await rootBundle
+          .load('assets/protocol/python-alpine-x86.tar.gz');
+      final tar = TarDecoder()
+          .decodeBytes(GZipDecoder().decodeBytes(data.buffer.asUint8List()));
+      int n = 0;
+      for (final file in tar) {
+        var name = file.name;
+        if (name.isEmpty || name.contains('..')) continue;
+        if (name.startsWith('./')) name = name.substring(2);
+        if (name.startsWith('/')) name = name.substring(1);
+        if (name.isEmpty) continue;
+        final target = File('${rootfsDir.path}/$name');
+        if (file.isFile) {
+          target.parent.createSync(recursive: true);
+          target.writeAsBytesSync(file.content as List<int>);
+          n++;
+        } else {
+          Directory(target.path).createSync(recursive: true);
+        }
+      }
+      if (!mounted) return;
+      setState(() {
+        _preparing = false;
+        _term += 'Python 环境已安装（$n 文件）。\n'
+            '终端里运行：python3 --version\n> ';
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _preparing = false;
+        _term += 'Python 安装失败：$e\n';
+      });
+    }
+  }
+
+  /// 把 QQBot 程序解压到 rootfs/opt/qqbot。
+  Future<void> _installQqbot() async {
+    if (_preparing) return;
+    if (_rootfsState.contains('未解压')) {
+      await _ensureRootfs();
+      if (!mounted || _rootfsState.contains('失败')) return;
+    }
+    setState(() {
+      _preparing = true;
+      _term += '正在安装 QQBot 程序…\n';
+    });
+    try {
+      final rootfsDir = Directory(_rootfs);
+      final outDir = Directory('${rootfsDir.path}/opt/qqbot');
+      outDir.createSync(recursive: true);
+      final data = await rootBundle
+          .load('assets/protocol/qqbot.tar.gz');
+      final tar = TarDecoder()
+          .decodeBytes(GZipDecoder().decodeBytes(data.buffer.asUint8List()));
+      int n = 0;
+      for (final file in tar) {
+        var name = file.name;
+        if (name.isEmpty || name.contains('..')) continue;
+        if (name.startsWith('./')) name = name.substring(2);
+        if (name.startsWith('/')) name = name.substring(1);
+        if (name.isEmpty) continue;
+        final target = File('${outDir.path}/$name');
+        if (file.isFile) {
+          target.parent.createSync(recursive: true);
+          target.writeAsBytesSync(file.content as List<int>);
+          n++;
+        } else {
+          Directory(target.path).createSync(recursive: true);
+        }
+      }
+      if (!mounted) return;
+      setState(() {
+        _preparing = false;
+        _term += 'QQBot 已安装到 /opt/qqbot（$n 文件）。\n'
+            '终端里运行：python3 /opt/qqbot/run.py --no-tray\n> ';
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _preparing = false;
+        _term += 'QQBot 安装失败：$e\n';
+      });
+    }
+  }
+
   Future<void> _sendCommand() async {
     final cmd = _inputController.text;
     if (cmd.trim().isEmpty) return;
@@ -329,6 +427,26 @@ class _IshSandboxPageState extends State<IshSandboxPage> {
                           onPressed: _preparing ? null : _deployProtocol,
                           icon: const Icon(Icons.hub_outlined, size: 16),
                           label: Text(_preparing ? '处理中…' : '部署 go-cqhttp'),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: _preparing ? null : _installPython,
+                          icon: const Icon(Icons.code_rounded, size: 16),
+                          label: Text(_preparing ? '处理中…' : '安装 Python'),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: _preparing ? null : _installQqbot,
+                          icon: const Icon(Icons.smart_toy_outlined, size: 16),
+                          label: Text(_preparing ? '处理中…' : '安装 QQBot'),
                         ),
                       ),
                     ],
